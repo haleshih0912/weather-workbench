@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>天气台</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{
+  --bg:#f2f2f7; --card:#ffffff; --label:#6e6e73; --text:#1c1c1e; --sub:#3a3a3c; --axis:#6e6e73;
+  --blue:#007aff; --orange:#ff9500; --green:#34c759; --red:#ff3b30; --purple:#af52de;
+  --sep:rgba(60,60,67,.10); --glass:rgba(255,255,255,.72); --shadow:0 2px 12px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04);
+  --r:22px; --r-sm:16px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:16px;line-height:1.4}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:16px}
+#app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px}
+
+/* Header */
+header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--sep)}
+.hrow{display:flex;align-items:center;gap:10px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top))}
+.loc{font-size:17px;font-weight:600;letter-spacing:.2px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc small{display:block;font-size:11px;font-weight:400;color:var(--label);margin-top:1px}
+.iconbtn{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(120,120,128,.12);flex:0 0 auto}
+.iconbtn:active{transform:scale(.92)}
+.iconbtn svg{width:18px;height:18px;fill:none;stroke:var(--text);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sync{font-size:11px;color:var(--label);text-align:right;line-height:1.25}
+.sync b{color:var(--sub);font-weight:500}
+
+/* Hero */
+#hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:26px 20px 22px;
+  border-radius:24px;box-shadow:var(--shadow);transition:background .6s ease}
+#hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28));border-radius:inherit}
+.hero-in{position:relative;z-index:2}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start}
+.hero-cond{font-size:20px;font-weight:500}
+.hero-cond .csub{font-size:13px;opacity:.85;font-weight:400;margin-top:2px}
+.hero-temp{font-size:96px;font-weight:200;line-height:.95;letter-spacing:-3px;margin:6px 0 0}
+.hero-meta{display:flex;gap:18px;font-size:14px;font-weight:500;margin-top:2px;opacity:.95}
+.hero-meta span b{font-weight:600}
+.hero-range{font-size:15px;opacity:.92;margin-top:10px;font-weight:500}
+.hero-range b{font-weight:600}
+.hero-conf{display:flex;align-items:center;gap:8px;font-size:12px;opacity:.92;margin-top:12px;font-weight:500;flex-wrap:wrap}
+.hero-conf .chip{background:rgba(255,255,255,.18);padding:3px 9px;border-radius:9px;font-weight:600;backdrop-filter:blur(8px)}
+.hero-conf .chip b{font-weight:700}
+
+/* Sections */
+.view{display:none;padding:12px 16px 0}
+.view.active{display:block;animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+.card h3{margin:0 0 12px;font-size:13px;font-weight:600;color:var(--label);letter-spacing:.4px;text-transform:none;display:flex;align-items:center;gap:6px}
+.card h3 .tag{margin-left:auto;font-size:11px;font-weight:500;color:var(--blue);background:rgba(0,122,255,.1);padding:2px 8px;border-radius:8px}
+
+/* Charts */
+.chart-wrap{width:100%;overflow:hidden}
+.chart-wrap svg{width:100%;height:auto;display:block}
+.axis-label{fill:var(--axis);font-size:10px;font-weight:500;font-family:var(--font)}
+.grid-line{stroke:var(--sep);stroke-width:.6}
+.axis-line{stroke:var(--sub);stroke-width:.8;opacity:.6}
+
+/* hourly strip */
+.strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none}
+.strip.dragging{cursor:grabbing;scroll-snap-type:none}
+.strip::-webkit-scrollbar{height:0}
+.hc{flex:0 0 auto;width:64px;scroll-snap-align:start;background:var(--card);border-radius:var(--r-sm);
+  box-shadow:var(--shadow);padding:10px 8px;text-align:center;transition:transform .15s}
+.hc:active{transform:scale(.95)}
+.hc.sel{box-shadow:0 0 0 2px var(--blue);border-radius:var(--r-sm)}
+.hc .ht{font-size:12px;color:var(--sub);font-weight:600}
+.hc .hi{width:26px;height:26px;margin:6px auto}
+.hc .hp{font-size:12px;font-weight:600}
+.hc .hr{font-size:11px;color:var(--blue);font-weight:600}
+.hc .hw{font-size:10px;color:var(--label);margin-top:2px}
+
+/* detail */
+.metric{border-top:.5px solid var(--sep);padding:13px 0}
+.metric:first-child{border-top:none}
+.mh{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.mh .mn{font-size:15px;font-weight:600}
+.mh .mv{margin-left:auto;font-size:22px;font-weight:300;letter-spacing:-.5px}
+.mh .mu{font-size:13px;color:var(--label);font-weight:500;margin-left:2px}
+.src{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.sr{display:flex;align-items:center;gap:8px;font-size:12px}
+.sr .sn{flex:1;color:var(--sub);display:flex;align-items:center;gap:6px;min-width:0}
+.sr .sn .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.sr .sv{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.sr .sw{width:42px;text-align:right;color:var(--label);font-variant-numeric:tabular-nums}
+.sr .ref-tag{font-size:9px;font-weight:600;color:var(--orange);background:rgba(255,149,0,.12);padding:1px 5px;border-radius:6px;margin-left:5px;flex:0 0 auto}
+.sr .bar{width:54px;height:4px;border-radius:2px;background:var(--sep);overflow:hidden;flex:0 0 auto}
+.sr .bar i{display:block;height:100%;background:var(--blue);border-radius:2px}
+
+/* minutely */
+.mini-row{display:flex;gap:3px;align-items:flex-end;height:64px;margin-top:4px}
+.mini-bar{flex:1;background:var(--blue);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+.mini-cap{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5}
+
+/* source overview */
+.src-ov{display:flex;flex-direction:column;gap:9px}
+.so{display:flex;align-items:center;gap:10px}
+.so .badge{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex:0 0 auto}
+.so .info{flex:1;min-width:0}
+.so .info .nm{font-size:14px;font-weight:600}
+.so .info .dt{font-size:11px;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.so .wk{font-size:13px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.so .ref{font-size:10px;color:var(--orange);font-weight:600;margin-left:4px}
+.src-divider{margin:14px 0 6px;padding-top:14px;border-top:.5px solid var(--sep);display:flex;flex-direction:column;gap:2px}
+.src-divider span{font-size:11px;font-weight:700;color:var(--label);letter-spacing:.4px}
+.src-divider small{font-size:11px;color:var(--label);opacity:.9;font-weight:400;line-height:1.5}
+.conf-box{margin-top:14px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,122,255,.09),rgba(175,82,222,.07));border-radius:16px;display:flex;flex-direction:column;gap:6px}
+.conf-head{font-size:13px;color:var(--sub);font-weight:600;display:flex;align-items:baseline;gap:8px}
+.conf-head b{color:var(--blue);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.conf-detail{font-size:11px;color:var(--label);line-height:1.6}
+.conf-detail code{font-family:ui-monospace,"SF Mono",Menlo,monospace;background:var(--sep);padding:1px 5px;border-radius:5px;font-size:10.5px;color:var(--sub)}
+
+/* location */
+.loc-tabs{display:flex;gap:8px;margin-bottom:12px}
+.ltab{flex:1;padding:9px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);
+  font-size:13px;font-weight:600;color:var(--sub);text-align:center}
+.ltab.on{background:var(--blue);color:#fff}
+.field{display:flex;gap:8px;margin-bottom:10px}
+.field input{flex:1;padding:11px 12px;border-radius:12px;border:.5px solid var(--sep);background:var(--card);outline:none}
+.field input:focus{border-color:var(--blue)}
+.btn{padding:11px 16px;border-radius:12px;background:var(--blue);color:#fff;font-size:14px;font-weight:600;flex:0 0 auto}
+.btn.sec{background:rgba(120,120,128,.16);color:var(--text)}
+.btn:active{transform:scale(.97)}
+#map{height:300px;border-radius:var(--r);box-shadow:var(--shadow);margin:10px 0;z-index:1;background:#dfe3e6}
+.res{background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:10px}
+.res div{padding:12px 14px;border-bottom:.5px solid var(--sep);font-size:14px;font-weight:500}
+.res div:last-child{border-bottom:none}
+.res div:active{background:rgba(0,122,255,.06)}
+.saved{display:flex;flex-direction:column;gap:8px}
+.sv{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px}
+.sv .sn{font-size:14px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sv .sd{font-size:11px;color:var(--label)}
+.sv .x{color:var(--red);font-size:13px;font-weight:600;padding:4px}
+.note{font-size:12px;color:var(--label);line-height:1.6;margin-top:6px}
+.warn{color:var(--red);font-size:12px;margin-top:6px;min-height:14px}
+
+/* calibrate */
+.cal-input{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.cal-input .ci{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:11px 12px}
+.cal-input label{font-size:11px;color:var(--label);font-weight:600}
+.cal-input input{width:100%;border:none;outline:none;font-size:18px;font-weight:600;margin-top:4px;background:transparent}
+.seg{display:flex;background:rgba(120,120,128,.16);border-radius:10px;padding:2px;margin-bottom:12px}
+.seg button{flex:1;padding:8px;border-radius:8px;font-size:13px;font-weight:600;color:var(--sub)}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
+.wt{display:flex;flex-direction:column;gap:8px}
+.wt .w{display:flex;align-items:center;gap:10px}
+.wt .w .nm{width:120px;font-size:13px;font-weight:600;flex:0 0 auto}
+.wt .w .track{flex:1;height:8px;border-radius:4px;background:var(--sep);overflow:hidden}
+.wt .w .track i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:4px}
+.wt .w .pc{width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums}
+
+/* bottom nav */
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:40;
+  background:var(--glass);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-top:.5px solid var(--sep);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 7px;color:var(--label);font-size:10px;font-weight:600}
+.navbtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.navbtn.on{color:var(--blue)}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:50;opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);width:100%;max-width:480px;z-index:60;
+  background:var(--bg);border-radius:22px 22px 0 0;padding:8px 16px max(20px,env(safe-area-inset-bottom));transition:transform .35s cubic-bezier(.32,.72,0,1)}
+.sheet.on{transform:translate(-50%,0)}
+.sheet .grip{width:36px;height:5px;border-radius:3px;background:var(--sep);margin:8px auto 14px}
+.sheet h4{margin:0 0 14px;font-size:17px;font-weight:700}
+.sheet .btn{width:100%;margin-bottom:10px;display:block;text-align:center}
+.sheet .btn.sec{background:rgba(120,120,128,.16);color:var(--text)}
+.sheet .btn.danger{background:rgba(255,59,48,.1);color:var(--red)}
+.sheet input[type=file]{display:none}
+.keyrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.keyrow label{font-size:13px;font-weight:600;width:64px;flex:0 0 auto}
+.keyrow input{flex:1;padding:10px 12px;border-radius:11px;border:.5px solid var(--sep);background:var(--card);outline:none}
+.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);background:rgba(0,0,0,.82);
+  color:#fff;padding:13px 20px;border-radius:14px;font-size:14px;font-weight:600;z-index:80;opacity:0;pointer-events:none;transition:.25s}
+.toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.loading{text-align:center;color:var(--label);font-size:13px;padding:40px 0}
+.spin{width:26px;height:26px;border:3px solid var(--sep);border-top-color:var(--blue);border-radius:50%;
+  margin:0 auto 12px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.leaflet-container{font-family:var(--font)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="hrow">
+      <div class="loc" id="locName">定位中…<small id="locSub">正在获取位置</small></div>
+      <div class="sync" id="syncBox">时间同步中<br><b>--:--:--</b></div>
+      <button class="iconbtn" id="btnBackup" aria-label="备份">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+      </button>
+      <button class="iconbtn" id="btnRefresh" aria-label="刷新">
+        <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v4h-4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- WEATHER VIEW -->
+  <section class="view active" id="v-weather">
+    <div id="hero">
+      <div class="hero-in">
+        <div class="hero-top">
+          <div class="hero-cond" id="heroCond">—<div class="csub" id="heroCondSub">数据加载中</div></div>
+          <div style="text-align:right">
+            <div class="hero-temp" id="heroTemp">--°</div>
+          </div>
+        </div>
+        <div class="hero-meta">
+          <span id="heroFeels">体感 --°</span>
+          <span id="heroWind">风 --</span>
+        </div>
+        <div class="hero-range" id="heroRange">最高 --° · 最低 --°</div>
+        <div class="hero-conf" id="heroConf"><span class="chip">置信度 <b id="heroConfPct">--%</b></span><span id="heroConfSrc">直连 0 · 先验 0</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>未来 24 小时气温 <span class="tag" id="tempSrc">综合</span></h3>
+      <div class="chart-wrap" id="tempChart"></div>
+    </div>
+
+    <div class="card">
+      <h3>未来 24 小时降水 <span class="tag" id="precipSrc">综合</span></h3>
+      <div class="chart-wrap" id="precipChart"></div>
+    </div>
+
+    <div class="card" id="miniCard" style="display:none">
+      <h3>未来 2 小时分钟级降水</h3>
+      <div class="mini-row" id="miniRow"></div>
+      <div class="mini-cap" id="miniCap"></div>
+    </div>
+
+    <div class="card">
+      <h3>逐小时 · 点选查看来源</h3>
+      <div class="strip" id="strip"></div>
+    </div>
+
+    <div class="card" id="detailCard">
+      <h3 id="detailTitle">当前时段明细</h3>
+      <div id="detail"></div>
+    </div>
+
+    <div class="card">
+      <h3>数据来源与权重</h3>
+      <div class="note" id="srcNote" style="margin-bottom:10px"></div>
+      <div class="src-ov" id="srcOverview"></div>
+    </div>
+  </section>
+
+  <!-- CALIBRATE VIEW -->
+  <section class="view" id="v-cal">
+    <div class="card">
+      <h3>实测校准</h3>
+      <div class="note">记录你所在地此刻的真实天气，系统按各源误差动态调整权重。记录越多，综合越准。</div>
+      <div class="cal-input" style="margin-top:12px">
+        <div class="ci"><label>实况气温 (°C)</label><input type="number" id="calTemp" placeholder="如 26.5" step="0.1"></div>
+        <div class="ci"><label>实况降水量 (mm)</label><input type="number" id="calPrec" placeholder="0 或 0.8" step="0.1"></div>
+      </div>
+      <div class="seg" id="calRainSeg">
+        <button class="on" data-v="0">当前无降水</button>
+        <button data-v="1">当前有降水</button>
+      </div>
+      <button class="btn" id="calSave" style="width:100%">保存本次实测</button>
+    </div>
+    <div class="card">
+      <h3>各源权重（实时）</h3>
+      <div class="wt" id="wtList"></div>
+      <button class="btn sec" id="calReset" style="width:100%;margin-top:14px">重置校准</button>
+    </div>
+  </section>
+
+  <!-- LOCATION VIEW -->
+  <section class="view" id="v-loc">
+    <div class="card">
+      <div class="loc-tabs">
+        <div class="ltab on" data-t="search">搜索</div>
+        <div class="ltab" data-t="manual">手动输入</div>
+        <div class="ltab" data-t="map">地图</div>
+      </div>
+      <div id="locSearch">
+        <div class="field">
+          <input id="geoQ" placeholder="搜索中国城市 / 街道 / 小区" inputmode="search">
+          <button class="btn" id="geoBtn">搜索</button>
+        </div>
+        <div class="res" id="geoRes"></div>
+        <div class="note">数据来自 OpenStreetMap，仅限中国范围。点选结果即定位。</div>
+      </div>
+      <div id="locManual" style="display:none">
+        <div class="field"><input id="manLat" placeholder="纬度 lat，如 31.2304"><button class="btn" id="manUse">定位</button></div>
+        <div class="field"><input id="manLng" placeholder="经度 lng，如 121.4737"></div>
+        <div class="warn" id="manWarn"></div>
+        <div class="note">格式也可直接输入「lat,lng」。范围限定中国（纬度 3–54，经度 73–135）。</div>
+      </div>
+      <div id="locMap" style="display:none">
+        <div id="map"></div>
+        <div class="note" id="mapAddr">拖动图钉或点击地图选点，自动反查地址。</div>
+        <button class="btn" id="mapUse" style="width:100%;margin-top:6px">用此位置刷新天气</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>已保存位置</h3>
+      <div class="saved" id="savedList"></div>
+      <div class="note" style="margin-top:10px">打开时默认回到上次使用的位置。</div>
+    </div>
+  </section>
+
+  <nav>
+    <button class="navbtn on" data-v="v-weather">
+      <svg viewBox="0 0 24 24"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.5-6.5l-1.4 1.4M7.9 16.1l-1.4 1.4m12.6 0l-1.4-1.4M7.9 7.9L6.5 6.5"/><circle cx="12" cy="12" r="4"/></svg>
+      天气
+    </button>
+    <button class="navbtn" data-v="v-cal">
+      <svg viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M8 19v-6m4 6V9m4 10v-9"/></svg>
+      校准
+    </button>
+    <button class="navbtn" data-v="v-loc">
+      <svg viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      位置
+    </button>
+  </nav>
+</div>
+
+<!-- backup sheet -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="grip"></div>
+  <h4>数据与设置</h4>
+  <div class="keyrow"><label>和风Key</label><input id="qkey" placeholder="QWeather 开发密钥（选填）"></div>
+  <div class="keyrow"><label>彩云Key</label><input id="ckey" placeholder="Caiyun 开发密钥（选填）"></div>
+  <div class="keyrow"><label>心知Key</label><input id="sxkey" placeholder="Seniverse 开发密钥（选填）"></div>
+  <button class="btn" id="saveKey">保存密钥</button>
+  <button class="btn sec" id="expBtn">导出备份 (JSON)</button>
+  <button class="btn sec" id="impBtn">导入恢复</button>
+  <input type="file" id="impFile" accept="application/json">
+  <button class="btn danger" id="clrBtn">清空全部数据</button>
+  <button class="btn sec" id="closeSheet" style="background:rgba(120,120,128,.16)">关闭</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+"use strict";
+const LS="wb_wx_";
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const APP={lat:31.2304,lng:121.4737,name:"上海",sub:"人民广场"};
+
+/* ---------- state ---------- */
+let ST={lastLat:null,lastLng:null,lastName:null,lastSub:null,saved:[],cal:{},qkey:"",ckey:"",sxkey:"",mapLat:null,mapLng:null};
+function load(){try{const j=JSON.parse(localStorage.getItem(LS+"state")||"{}");ST=Object.assign(ST,j);}catch(e){}}
+function save(){try{localStorage.setItem(LS+"state",JSON.stringify(ST));}catch(e){}}
+
+/* ---------- time sync ---------- */
+let timeOffset=0;
+function now(){return new Date(Date.now()+timeOffset);}
+async function syncTime(){
+  // prefer worldtimeapi, fallback to HTTP Date header of data API
+  try{
+    let r=await fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai",{cache:"no-store"});
+    if(r.ok){let j=await r.json();let st=new Date(j.datetime).getTime();let off=st-Date.now();
+      if(Math.abs(off)<600000){timeOffset=off;return "互联网";}}
+  }catch(e){}
+  try{
+    let r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=31.2&longitude=121.4&current=temperature_2m",{method:"HEAD",cache:"no-store"});
+    let dh=r.headers.get("date");
+    if(dh){let st=new Date(dh).getTime();timeOffset=st-Date.now();return "互联网";}
+  }catch(e){}
+  return "本机";
+}
+function fmtClock(d){return [d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,"0")).join(":");}
+
+/* ---------- models & weights ----------
+   Each model = an independent national NWP center. Pulled live via the
+   standard forecast API (models=). Suffix in response == request name. */
+const MODELS=[
+  {req:"ecmwf_ifs04",key:"ecmwf",name:"ECMWF IFS",org:"欧洲中心 0.04°",country:"欧洲",prior:.20,color:"#0a84ff"},
+  {req:"ecmwf_ifs025",key:"ecmwf025",name:"ECMWF IFS025",org:"欧洲中心 0.25°",country:"欧洲",prior:.17,color:"#0a84ff"},
+  {req:"ecmwf_aifs025",key:"aifs",name:"ECMWF AIFS",org:"欧洲中心 AI",country:"欧洲",prior:.16,color:"#5ac8fa"},
+  {req:"icon_seamless",key:"icon",name:"ICON",org:"德国 DWD",country:"德国",prior:.16,color:"#30b0c7"},
+  {req:"kma_seamless",key:"kma",name:"KMA",org:"韩国气象厅",country:"韩国",prior:.10,color:"#ff9f0a"},
+  {req:"ukmo_seamless",key:"ukmo",name:"UKMO",org:"英国气象局",country:"英国",prior:.12,color:"#5e5ce6"},
+  {req:"jma_seamless",key:"jma",name:"JMA",org:"日本气象厅",country:"日本",prior:.10,color:"#ff375f"},
+  {req:"meteofrance_seamless",key:"arpege",name:"ARPEGE",org:"法国",country:"法国",prior:.08,color:"#ff9f0a"},
+  {req:"gfs_seamless",key:"gfs",name:"GFS",org:"美国 NCEP",country:"美国",prior:.08,color:"#34c759"},
+  {req:"gem_seamless",key:"gem",name:"GEM",org:"加拿大",country:"加拿大",prior:.06,color:"#bf5af2"},
+  {req:"metno_nordic",key:"metno",name:"METNO",org:"挪威",country:"挪威",prior:.05,color:"#64d2ff"}
+];
+// domestic authority references (research-weighted, not live-blended unless key present)
+const DOMESTIC=[
+  {key:"cma",name:"中央气象台 CMA",org:"GRAPES 数值预报",country:"中国",prior:.13,color:"#ff3b30",ref:true,note:"中国区域降水准确率领先 ECMWF（3h TS 更优，>10mm 阈值全面占优）"},
+  {key:"moji",name:"墨迹天气",org:"2024 全球准确率第一",country:"中国",prior:.10,color:"#ff9500",ref:true,note:"24h 气温误差≈0.8°C，降水概率误差<8%"},
+  {key:"caiyun",name:"彩云天气",org:"分钟级降水",country:"中国",prior:.07,color:"#34c759",ref:true,note:"2 小时逐分钟降水最强，需密钥接入"},
+  {key:"msn",name:"MSN 天气",org:"微软多模型聚合",country:"美国",prior:.06,color:"#00a4ef",ref:true,note:"聚合 GFS/ECMWF 等多家模式，北美评测表现稳定"},
+  {key:"qweather",name:"和风天气 QWeather",org:"Apple 中国数据源",country:"中国",prior:.11,color:"#007aff",ref:false,note:"浏览器直连（需密钥），已接入实时参与"},
+  {key:"seniverse",name:"心知天气 Seniverse",org:"实时+逐小时+指数",country:"中国",prior:.09,color:"#ff2d55",ref:false,note:"浏览器直连（需密钥），已接入实时参与"}
+];
+
+/* calibration effective weight */
+function calFactor(key){
+  let c=ST.cal[key];
+  if(!c)return 1;
+  let e=Math.min(c.tempEma||0,8);
+  return 1/(e*e+0.4);
+}
+function modelPrior(modelKey){
+  let m=MODELS.find(x=>x.key===modelKey);
+  if(m)return m.prior;
+  let d=DOMESTIC.find(x=>x.key===modelKey);
+  return d?d.prior:0.05;
+}
+function effWeight(modelKey){return modelPrior(modelKey)*calFactor(modelKey);}
+
+/* ---------- weather code mapping ---------- */
+function wcode(c){
+  const m={
+    0:["晴","clear-day"],1:["少云","clear-day"],2:["多云","cloudy"],3:["阴","cloudy"],
+    45:["雾","fog"],48:["雾凇","fog"],
+    51:["毛毛雨","rain"],53:["小雨","rain"],55:["中雨","rain"],
+    56:["冻雨","rain"],57:["冻雨","rain"],
+    61:["小雨","rain"],63:["中雨","rain"],65:["大雨","rain"],
+    66:["冻雨","rain"],67:["冻雨","rain"],
+    71:["小雪","snow"],73:["中雪","snow"],75:["大雪","snow"],77:["雪粒","snow"],
+    80:["阵雨","rain"],81:["阵雨","rain"],82:["强阵雨","rain"],
+    85:["阵雪","snow"],86:["强阵雪","snow"],
+    95:["雷阵雨","thunder"],96:["雷阵雨伴雹","thunder"],99:["强雷暴","thunder"]
+  };
+  return m[c]||["未知","cloudy"];
+}
+function windDirText(deg){
+  if(deg==null)return "—";
+  const dirs=["北","东北","东","东南","南","西南","西","西北"];
+  const idx=Math.round(((deg%360)+360)%360/45)%8;
+  return dirs[idx]+" "+Math.round(deg)+"°";
+}
+function uvText(v){
+  if(v==null)return "—";
+  const n=Math.round(v);
+  let cat="低";
+  if(n>=11)cat="极强";else if(n>=8)cat="很强";else if(n>=6)cat="强";else if(n>=3)cat="中等";else if(n>=1)cat="弱";
+  return n+" ("+cat+")";
+}
+function heroBg(code,isDay){
+  if(code>=95)return "linear-gradient(160deg,#2a2d3a,#4a3f5a)";
+  if(code>=80||(code>=51&&code<=67))return isDay?"linear-gradient(160deg,#3a5a78,#5a7a92)":"linear-gradient(160deg,#1c2a3a,#34465a)";
+  if(code>=71)return "linear-gradient(160deg,#5b6b7c,#9fb0c0)";
+  if(code>=45)return "linear-gradient(160deg,#6b747c,#a8b2b8)";
+  if(code>=3)return isDay?"linear-gradient(160deg,#5c6b7a,#8794a3)":"linear-gradient(160deg,#2a3242,#4a5468)";
+  return isDay?"linear-gradient(160deg,#2e6fb0,#6fb0e8)":"linear-gradient(160deg,#0b1430,#26345c)";
+}
+function iconSVG(type,size){
+  size=size||26;
+  const s='<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">';
+  if(type==="clear-day")return s+'<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>';
+  if(type==="cloudy")return s+'<path d="M7 18a4 4 0 0 1 .4-8 5 5 0 0 1 9.5 1.3A3.5 3.5 0 0 1 17 18H7z"/><circle cx="9" cy="8" r="2.4"/></svg>';
+  if(type==="rain")return s+'<path d="M7 14a4 4 0 0 1 .4-8 5 5 0 0 1 9.5 1.3A3.5 3.5 0 0 1 17 14H7z"/><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"/></svg>';
+  if(type==="snow")return s+'<path d="M7 14a4 4 0 0 1 .4-8 5 5 0 0 1 9.5 1.3A3.5 3.5 0 0 1 17 14H7z"/><path d="M9 19h.01M12 20v.01M15 19h.01M10.5 21h.01M13.5 21h.01"/></svg>';
+  if(type==="thunder")return s+'<path d="M7 14a4 4 0 0 1 .4-8 5 5 0 0 1 9.5 1.3A3.5 3.5 0 0 1 17 14H7z"/><path d="M12 16l-2 4h3l-2 4"/></svg>';
+  if(type==="fog")return s+'<path d="M4 9h16M4 13h16M4 17h12"/></svg>';
+  return s+'<path d="M7 14a4 4 0 0 1 .4-8 5 5 0 0 1 9.5 1.3A3.5 3.5 0 0 1 17 14H7z"/></svg>';
+}
+
+/* ---------- fetch: multi-model deterministic (the core multi-source) ---------- */
+async function fetchModels(lat,lng){
+  const base="https://api.open-meteo.com/v1/forecast";
+  const reqs=MODELS.map(m=>m.req).join(",");
+  const vars="temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,pressure_msl,cloud_cover,visibility,uv_index";
+  const url=base+"?latitude="+lat+"&longitude="+lng+"&hourly="+vars+"&models="+reqs+"&forecast_days=2&timezone=auto";
+  const r=await fetch(url);if(!r.ok)throw new Error("models");
+  const j=await r.json();if(j.error)throw new Error(j.reason);
+  return j;
+}
+function parseModels(j){
+  const h=j.hourly,time=h.time;
+  const models=[];
+  for(const m of MODELS){
+    const tkey="temperature_2m_"+m.req;
+    if(!(tkey in h))continue;
+    const temp=h[tkey];
+    if(!temp||temp.every(v=>v==null))continue; // skip models returning no data
+    models.push({key:m.key,name:m.name,org:m.org,country:m.country,prior:m.prior,color:m.color,
+      temp:temp,
+      precip:h["precipitation_"+m.req]||[],
+      wind:h["wind_speed_10m_"+m.req]||[],
+      gust:h["wind_gusts_10m_"+m.req]||[],
+      dir:h["wind_direction_10m_"+m.req]||[],
+      hum:h["relative_humidity_2m_"+m.req]||[],
+      pres:h["pressure_msl_"+m.req]||[],
+      cloud:h["cloud_cover_"+m.req]||[],
+      vis:h["visibility_"+m.req]||[],
+      uv:h["uv_index_"+m.req]||[]});
+  }
+  return {time,models};
+}
+/* ---------- fetch: ensemble for true probabilistic precip ---------- */
+async function fetchEnsemble(lat,lng){
+  const base="https://ensemble-api.open-meteo.com/v1/ensemble";
+  const models=["icon_seamless","gfs_seamless"].join(",");
+  const url=base+"?latitude="+lat+"&longitude="+lng+"&hourly=precipitation&models="+models+"&forecast_days=2&timezone=auto";
+  const r=await fetch(url);if(!r.ok)throw new Error("ens");
+  const j=await r.json();if(j.error)throw new Error(j.reason);
+  return j;
+}
+function parseEnsembleProb(j){
+  // returns precipProb[] from ICON+GFS ensemble members
+  const h=j.hourly;
+  const memberPrecip={};
+  for(const suf of ["icon_seamless_eps","ncep_gefs_seamless"]){
+    const re=new RegExp("^precipitation_member\\d+_"+suf.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"$");
+    for(const k in h){if(re.test(k))(memberPrecip[suf]=memberPrecip[suf]||[]).push(h[k]);}
+  }
+  const n=h.time.length;const out=new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    let s=0,c=0;for(const suf in memberPrecip){const a=memberPrecip[suf];if(!a.length)continue;
+      let r=0;for(const x of a){if(x&&x[i]!=null&&x[i]>=0.1)r++;}s+=r/a.length;c++;}
+    out[i]=c?s/c:0;
+  }
+  return out;
+}
+/* ---------- fetch: main forecast ---------- */
+async function fetchForecast(lat,lng){
+  const base="https://api.open-meteo.com/v1/forecast";
+  const url=base+"?latitude="+lat+"&longitude="+lng+
+    "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,visibility"+
+    "&hourly=precipitation_probability,temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,pressure_msl,cloud_cover,visibility"+
+    "&daily=temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset,precipitation_probability_max"+
+    "&forecast_days=2&timezone=auto";
+  const r=await fetch(url);if(!r.ok)throw new Error("fc");
+  const j=await r.json();if(j.error)throw new Error(j.reason);
+  return j;
+}
+/* ---------- fetch: minutely ---------- */
+async function fetchMinutely(lat,lng){
+  const url="https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lng+
+    "&minutely_15=precipitation,precipitation_probability&forecast_days=1&past_minutely_15=0&timezone=auto";
+  const r=await fetch(url);if(!r.ok)throw new Error("mini");
+  const j=await r.json();
+  return j;
+}
+/* ---------- fetch: QWeather (optional) ---------- */
+async function fetchQWeather(lat,lng,key){
+  if(!key)return null;
+  try{
+    const loc=lng.toFixed(4)+","+lat.toFixed(4);
+    const nowR=await fetch("https://devapi.qweather.com/v7/weather/now?location="+loc+"&key="+key);
+    const nowJ=await nowR.json();
+    const hR=await fetch("https://devapi.qweather.com/v7/weather/24h?location="+loc+"&key="+key);
+    const hJ=await hR.json();
+    if(nowJ.code!=="200"||hJ.code!=="200")return null;
+    return {now:nowJ.now,hourly:hJ.hourly};
+  }catch(e){return null;}
+}
+async function fetchCaiyun(lat,lng,key){
+  if(!key)return null;
+  try{
+    const url="https://api.caiyunapp.com/v2.6/"+key+"/"+lng.toFixed(4)+","+lat.toFixed(4)+"/weather?dailysteps=1&hourlysteps=24&alert=false";
+    const r=await fetch(url);if(!r.ok)return null;
+    const j=await r.json();
+    if(j.status!=="ok")return null;
+    return j;
+  }catch(e){return null;}
+}
+/* parse Caiyun v2.6 hourly → arrays aligned to dtime (length n, null for missing) */
+function parseCaiyun(j,dtime){
+  if(!j||j.status!=="ok"||!j.result||!j.result.hourly)return null;
+  const hr=j.result.hourly;
+  const build=arr=>{const m={};if(!arr)return m;arr.forEach(o=>{if(o&&o.datetime)m[o.datetime.slice(0,16)]=o.value;});return m;};
+  const tempM=build(hr.temperature);
+  const precipM=build(hr.precipitation);
+  const windM=build(hr.wind?hr.wind.map(o=>({datetime:o.datetime,value:o.speed?o.speed.value:null})):null);
+  const humM=build(hr.humidity);
+  const presM=build(hr.pressure);
+  const cloudM=build(hr.cloudrate);
+  const visM=build(hr.visibility);
+  const n=dtime.length;
+  const at=(M,i)=>{const k=dtime[i]&&dtime[i].slice(0,16);return k&&M[k]!=null?M[k]:null;};
+  const arr=M=>{const a=new Array(n);for(let i=0;i<n;i++)a[i]=at(M,i);return a;};
+  return {temp:arr(tempM),precip:arr(precipM),wind:arr(windM),hum:arr(humM),pres:arr(presM),cloud:arr(cloudM),vis:arr(visM)};
+}
+/* ---------- fetch: Seniverse / 心知天气 (optional) ---------- */
+async function fetchSeniverse(lat,lng,key){
+  if(!key)return null;
+  try{
+    const loc=lng.toFixed(4)+","+lat.toFixed(4);
+    const nowR=await fetch("https://api.seniverse.com/v3/weather/now.json?key="+key+"&location="+loc+"&language=zh-Hans&unit=c");
+    const nowJ=await nowR.json();
+    const hR=await fetch("https://api.seniverse.com/v3/weather/hourly.json?key="+key+"&location="+loc+"&language=zh-Hans&unit=c&start=0&hours=24");
+    const hJ=await hR.json();
+    if(nowJ.status!=="OK"||hJ.status!=="OK"||!hJ.results||!hJ.results[0]||!hJ.results[0].hourly)return null;
+    return {now:nowJ.results[0].now,hourly:hJ.results[0].hourly};
+  }catch(e){return null;}
+}
+/* parse Seniverse hourly → arrays aligned to dtime (length n, null for missing). vis km→m to match our meters. */
+function parseSeniverse(j,dtime){
+  if(!j||!j.hourly)return null;
+  const hr=j.hourly;
+  const build=arr=>{const m={};if(!arr)return m;arr.forEach(o=>{if(o&&o.time)m[o.time.slice(0,16)]=o;});return m;};
+  const M=build(hr);
+  const n=dtime.length;
+  const at=i=>{const k=dtime[i]&&dtime[i].slice(0,16);return k&&M[k]?M[k]:null;};
+  const arr=fn=>{const a=new Array(n);for(let i=0;i<n;i++){const o=at(i);a[i]=o?fn(o):null;}return a;};
+  return {
+    temp:arr(o=>o.temperature!=null?parseFloat(o.temperature):null),
+    precip:arr(o=>parseFloat(o.precip)||0),
+    wind:arr(o=>o.wind_speed!=null?parseFloat(o.wind_speed):null),
+    gust:arr(o=>null),
+    dir:arr(o=>o.wind_direction_degree!=null?parseFloat(o.wind_direction_degree):null),
+    hum:arr(o=>o.humidity!=null?parseFloat(o.humidity):null),
+    pres:arr(o=>o.pressure!=null?parseFloat(o.pressure):null),
+    cloud:arr(o=>o.cloud!=null?parseFloat(o.cloud):null),
+    vis:arr(o=>o.visibility!=null?parseFloat(o.visibility)*1000:null),
+    uv:arr(o=>o.uv_index!=null?parseFloat(o.uv_index):null)
+  };
+}
+
+/* ---------- composite from models ---------- */
+function blend(models,keyFn,i){
+  let s=0,w=0;
+  for(const m of models){
+    const arr=keyFn(m);if(!arr||arr[i]==null)continue;
+    const ew=effWeight(m.key);s+=arr[i]*ew;w+=ew;
+  }
+  return w?s/w:null;
+}
+function blendMap(models,i){
+  // returns {temp,precip,wind,gust,dir,hum,pres,cloud,vis,uv} composite
+  return {
+    temp:blend(models,m=>m.temp,i),
+    precip:blend(models,m=>m.precip,i),
+    wind:blend(models,m=>m.wind,i),
+    gust:blend(models,m=>m.gust,i),
+    dir:blend(models,m=>m.dir,i),
+    hum:blend(models,m=>m.hum,i),
+    pres:blend(models,m=>m.pres,i),
+    cloud:blend(models,m=>m.cloud,i),
+    vis:blend(models,m=>m.vis,i),
+    uv:blend(models,m=>m.uv,i)
+  };
+}
+
+/* ---------- global data ---------- */
+let D={}; // parsed composite + raw
+let selHour=0;
+let useQW=null, useCY=null, useSX=null;
+
+/* ---------- charts with axes ---------- */
+function smoothPath(pts){
+  if(pts.length<3)return pts.map(p=>"M"+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L").replace(/^M/,"");
+  let d="M"+pts[0][0].toFixed(1)+" "+pts[0][1].toFixed(1);
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
+    const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
+    d+=" C"+c1x.toFixed(1)+" "+c1y.toFixed(1)+" "+c2x.toFixed(1)+" "+c2y.toFixed(1)+" "+p2[0].toFixed(1)+" "+p2[1].toFixed(1);
+  }
+  return d;
+}
+function lineChart(opts){
+  // opts: values[], xlabels[], ymin, ymax, yunit, color
+  const W=340,H=192,L=36,R=14,T=18,B=30;
+  const pw=W-L-R,ph=H-T-B,n=opts.values.length;
+  const xf=i=>L+(n<=1?pw/2:(i/(n-1))*pw);
+  const yf=v=>T+(1-(v-opts.ymin)/(opts.ymax-opts.ymin))*ph;
+  let grid="";
+  const ticks=4;
+  for(let g=0;g<=ticks;g++){
+    const v=opts.ymin+(opts.ymax-opts.ymin)*g/ticks;
+    const y=yf(v);
+    grid+='<line class="grid-line" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>';
+    grid+='<text class="axis-label" x="3" y="'+(y+3.5)+'">'+Math.round(v)+'</text>';
+  }
+  grid+='<text class="axis-label" x="3" y="'+(T-5)+'">'+opts.yunit+'</text>';
+  let xl="";const step=Math.max(1,Math.floor(n/6));
+  for(let i=0;i<n;i+=step){
+    xl+='<text class="axis-label" x="'+xf(i)+'" y="'+(H-11)+'" text-anchor="middle">'+opts.xlabels[i]+'</text>';
+  }
+  const pts=opts.values.map((v,i)=>[xf(i),yf(v)]);
+  const d=smoothPath(pts);
+  let area="M"+pts[0][0].toFixed(1)+" "+yf(opts.ymin).toFixed(1);
+  pts.forEach(p=>area+=" L"+p[0].toFixed(1)+" "+p[1].toFixed(1));
+  area+=" L"+pts[n-1][0].toFixed(1)+" "+yf(opts.ymin).toFixed(1)+" Z";
+  const gid="g"+Math.random().toString(36).slice(2,7);
+  let dots="";
+  pts.forEach((p,i)=>{
+    if(i===0)dots+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="4" fill="'+opts.color+'" stroke="#fff" stroke-width="1.6"/>';
+    else dots+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.2" fill="'+opts.color+'"/>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%">'+
+    '<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0" stop-color="'+opts.color+'" stop-opacity=".24"/>'+
+    '<stop offset="1" stop-color="'+opts.color+'" stop-opacity="0"/></linearGradient></defs>'+
+    grid+
+    '<path d="'+area+'" fill="url(#'+gid+')"/>'+
+    '<path d="'+d+'" fill="none" stroke="'+opts.color+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'+
+    dots+
+    '<line class="axis-line" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'"/>'+
+    '<line class="axis-line" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>'+
+    xl+'</svg>';
+}
+function barChart(opts){
+  // values 0..max, xlabels, color, yunit
+  const W=340,H=184,L=34,R=14,T=18,B=30;
+  const pw=W-L-R,ph=H-T-B,n=opts.values.length;
+  const bw=Math.min(11,pw/n*0.66);
+  const yf=v=>T+(1-v/opts.ymax)*ph;
+  let grid="";const ticks=4;
+  for(let g=0;g<=ticks;g++){
+    const v=opts.ymax*g/ticks;const y=yf(v);
+    grid+='<line class="grid-line" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>';
+    grid+='<text class="axis-label" x="3" y="'+(y+3.5)+'">'+Math.round(v)+'</text>';
+  }
+  grid+='<text class="axis-label" x="3" y="'+(T-5)+'">'+opts.yunit+'</text>';
+  let bars="",xl="",hl="";const step=Math.max(1,Math.floor(n/6));
+  for(let i=0;i<n;i++){
+    const x=L+(n<=1?pw/2:((i+0.5)/n)*pw);
+    const v=opts.values[i];const bh=(v/opts.ymax)*ph;const y=T+ph-bh;
+    bars+='<rect x="'+(x-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1.5,bh).toFixed(1)+'" rx="3" fill="'+opts.color+'" opacity="'+(v>0?.92:.2)+'"/>';
+    if(i===0)hl='<rect x="'+(x-bw/2-1.5).toFixed(1)+'" y="'+(y-1.5).toFixed(1)+'" width="'+(bw+3).toFixed(1)+'" height="'+Math.max(1.5,bh+3).toFixed(1)+'" rx="4" fill="none" stroke="'+opts.color+'" stroke-width="1.6"/>';
+    if(i%step===0)xl+='<text class="axis-label" x="'+x.toFixed(1)+'" y="'+(H-11)+'" text-anchor="middle">'+opts.xlabels[i]+'</text>';
+  }
+  return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%">'+grid+bars+hl+
+    '<line class="axis-line" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'"/>'+
+    '<line class="axis-line" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>'+xl+'</svg>';
+}
+
+/* ---------- render ---------- */
+function hourLabels(time,startIdx){
+  const out=[];
+  for(let i=startIdx;i<time.length;i++){
+    const d=new Date(time[i].replace(" ","T")+"Z"); // timezone=auto gives local wall time; treat as label
+    out.push(time[i].slice(11,16));
+  }
+  return out;
+}
+
+function render(){
+  if(!D.time){return;}
+  const t=D.time, n=t.length;
+  const startIdx=D.startIdx;
+  const labels=hourLabels(t,startIdx);
+  // temp composite
+  const temps=[],precs=[],probs=[];
+  for(let i=startIdx;i<n;i++){
+    const b=D.composite[i];
+    temps.push(b.temp!=null?b.temp:0);
+    precs.push(b.precip!=null?b.precip:0);
+    probs.push((D.precipProb[i]||0)*100);
+  }
+  // temp range for y
+  let tmin=Math.min(...temps),tmax=Math.max(...temps);
+  const pad=Math.max(2,(tmax-tmin)*0.15);
+  // lineChart
+  $("#tempChart").innerHTML=lineChart({values:temps,xlabels:labels,ymin:Math.floor(tmin-pad),ymax:Math.ceil(tmax+pad),color:"#ff9f0a",yunit:"°C"});
+  $("#precipChart").innerHTML=barChart({values:probs,xlabels:labels,ymax:100,color:"#0a84ff",yunit:"%"});
+
+  // hero
+  const cur=D.current;
+  const wc=wcode(cur.weather_code);
+  const isDay=(now().getHours()>=6&&now().getHours()<19);
+  $("#heroCond").innerHTML=wc[0]+'<div class="csub" id="heroCondSub">'+(isDay?"白天":"夜间")+' · 数据 '+D.srcLabel+'</div>';
+  $("#heroTemp").textContent=Math.round(cur.temperature_2m)+"°";
+  $("#heroFeels").textContent="体感 "+Math.round(cur.apparent_temperature)+"°";
+  $("#heroWind").textContent="风 "+Math.round(cur.wind_speed_10m)+" km/h";
+  const dmax=D.daily.temperature_2m_max[0],dmin=D.daily.temperature_2m_min[0];
+  $("#heroRange").innerHTML="最高 "+Math.round(dmax)+"° · 最低 "+Math.round(dmin)+"°";
+  $("#hero").style.background=heroBg(cur.weather_code,isDay);
+  // confidence chip
+  const conf=computeConfidence();
+  $("#heroConfPct").textContent=conf.score+"%";
+  $("#heroConfSrc").textContent="直连 "+conf.liveN+" · 先验 "+(conf.priorSum*100).toFixed(0)+"%";
+
+  // strip
+  const strip=$("#strip");strip.innerHTML="";
+  for(let k=0;k<temps.length;k++){
+    const i=startIdx+k;
+    const b=D.composite[i];
+    const hc=document.createElement("div");
+    hc.className="hc"+(k===selHour?" sel":"");
+    const wc2=wcode(D.hourCode[i]);
+    hc.innerHTML='<div class="ht">'+labels[k]+'</div>'+
+      '<div class="hi">'+iconSVG(wc2[1],26)+'</div>'+
+      '<div class="hr">'+(D.precipProb[i]!=null?Math.round(D.precipProb[i]*100)+"%":"—")+'</div>'+
+      '<div class="hp">'+Math.round(b.temp)+'°</div>'+
+      '<div class="hw">'+Math.round(b.wind)+' km/h</div>';
+    hc.onclick=()=>{selHour=k;renderDetail();$$(".hc").forEach((e,idx)=>e.classList.toggle("sel",idx===k));};
+    strip.appendChild(hc);
+  }
+  renderDetail();
+  renderSources();
+
+  // minutely
+  if(D.mini&&D.mini.length){
+    const row=$("#miniRow");row.innerHTML="";
+    const maxv=Math.max(0.1,...D.mini.map(x=>x.p));
+    D.mini.forEach(x=>{
+      const bar=document.createElement("div");
+      bar.className="mini-bar";
+      bar.style.height=Math.max(3,(x.p/maxv)*64)+"px";
+      bar.title=x.t.slice(11,16)+" · "+x.p.toFixed(1)+"mm";
+      row.appendChild(bar);
+    });
+    const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
+    const sum=D.mini.reduce((a,b)=>a+b.p,0);
+    $("#miniCap").innerHTML="未来 2 小时累计约 <b>"+sum.toFixed(1)+" mm</b>。"+
+      (peak.p>0?("降雨高峰约在 <b>"+peak.t.slice(11,16)+"</b>，强度 "+peak.p.toFixed(1)+" mm/15min。"):"无明显降雨。");
+    $("#miniCard").style.display="block";
+  }
+}
+
+function renderDetail(){
+  const i=D.startIdx+selHour;
+  const b=D.composite[i];
+  const labels=hourLabels(D.time,D.startIdx);
+  $("#detailTitle").textContent=labels[selHour]+" 时段明细 · 按数据量排序";
+  // order: rainfall first
+  const metrics=[
+    {n:"降水概率",v:(D.precipProb[i]||0)*100,u:"%",fmt:v=>Math.round(v)+"%",key:"prob"},
+    {n:"降水量",v:b.precip,u:"mm",fmt:v=>(v==null?"—":v.toFixed(1)+" mm"),key:"precip"},
+    {n:"风速",v:b.wind,u:"km/h",fmt:v=>(v==null?"—":Math.round(v)+" km/h"),key:"wind"},
+    {n:"最大瞬时风速",v:b.gust,u:"km/h",fmt:v=>(v==null?"—":Math.round(v)+" km/h"),key:"gust"},
+    {n:"风向",v:b.dir,u:"",fmt:v=>(v==null?"—":windDirText(v)),key:"dir"},
+    {n:"气温",v:b.temp,u:"°",fmt:v=>(v==null?"—":Math.round(v)+"°"),key:"temp"},
+    {n:"体感",v:(b.temp!=null?b.temp-1:null),u:"°",fmt:v=>(v==null?"—":Math.round(v)+"°"),key:"feels"},
+    {n:"湿度",v:b.hum,u:"%",fmt:v=>(v==null?"—":Math.round(v)+"%"),key:"hum"},
+    {n:"云量",v:b.cloud,u:"%",fmt:v=>(v==null?"—":Math.round(v)+"%"),key:"cloud"},
+    {n:"气压",v:b.pres,u:"hPa",fmt:v=>(v==null?"—":Math.round(v)+" hPa"),key:"pres"},
+    {n:"能见度",v:b.vis,u:"km",fmt:v=>(v==null?"—":(v/1000).toFixed(1)+" km"),key:"vis"},
+    {n:"紫外线强度",v:b.uv,u:"",fmt:v=>(v==null?"—":uvText(v)),key:"uv"}
+  ];
+  let html="";
+  metrics.forEach(m=>{
+    const mv=m.v==null?"—":fmtVal(m,m.v);
+    html+='<div class="metric"><div class="mh"><span class="mn">'+m.n+'</span><span class="mv">'+mv+'</span></div>';
+    html+='<div class="src">';
+    // sources for this metric
+    const srcs=sourceLinesFor(i,m);
+    srcs.forEach(s=>{
+      html+='<div class="sr"><span class="sn"><span class="dot" style="background:'+s.color+'"></span>'+s.name+(s.ref?'<span class="ref-tag">参考</span>':'')+'</span>'+
+        '<span class="sv">'+s.val+'</span>'+
+        '<span class="bar"><i style="width:'+s.pc+'%"></i></span>'+
+        '<span class="sw">'+s.w+'%</span></div>';
+    });
+    html+='</div></div>';
+  });
+  $("#detail").innerHTML=html;
+}
+function sourceLinesFor(i,m){
+  const out=[];
+  const b=D.composite[i];
+  const cval=(m.key==="prob")?(D.precipProb[i]!=null?D.precipProb[i]*100:null)
+            :(m.key==="feels")?(b.temp!=null?b.temp-1:null)
+            :(b[m.key]!=null?b[m.key]:null);
+  D.models.forEach(mod=>{
+    let val=null;
+    if(m.key==="temp")val=mod.temp[i];
+    else if(m.key==="precip")val=mod.precip[i];
+    else if(m.key==="wind")val=mod.wind[i];
+    else if(m.key==="hum")val=mod.hum[i];
+    else if(m.key==="pres")val=mod.pres[i];
+    else if(m.key==="cloud")val=mod.cloud[i];
+    else if(m.key==="vis")val=mod.vis[i];
+    else if(m.key==="gust")val=mod.gust[i];
+    else if(m.key==="dir")val=mod.dir[i];
+    else if(m.key==="uv")val=mod.uv[i];
+    else if(m.key==="feels")val=mod.temp[i]!=null?mod.temp[i]-1:null;
+    else if(m.key==="prob"){val=D.precipProb[i]!=null?D.precipProb[i]*100:null;}
+    if(val==null)return;
+    const w=effWeight(mod.key);
+    out.push({name:mod.name+" · "+mod.country,color:mod.color,val:fmtVal(m,val),w:w,pc:0});
+  });
+  if(useQW&&useQW.hourly&&useQW.hourly[i]){
+    const h=useQW.hourly[i];
+    let val=null;
+    if(m.key==="temp")val=h.temp;
+    else if(m.key==="precip")val=parseFloat(h.precip)||0;
+    else if(m.key==="wind")val=h.windSpeed;
+    else if(m.key==="hum")val=h.humidity;
+    else if(m.key==="feels")val=h.temp!=null?h.temp-1:null;
+    else if(m.key==="prob")val=h.pop!=null?h.pop:null;
+    else if(m.key==="dir")val=h.wind360!=null?parseFloat(h.wind360):null;
+    if(val!=null){
+      const w=effWeight("qweather");
+      out.push({name:"和风天气 QWeather · 中国",color:"#007aff",val:fmtVal(m,val),w:w,pc:0});
+    }
+  }
+  if(useSX&&useSX.hourly&&useSX.hourly[i]){
+    const h=useSX.hourly[i];
+    let val=null;
+    if(m.key==="temp")val=h.temperature!=null?parseFloat(h.temperature):null;
+    else if(m.key==="precip")val=parseFloat(h.precip)||0;
+    else if(m.key==="wind")val=h.wind_speed!=null?parseFloat(h.wind_speed):null;
+    else if(m.key==="hum")val=h.humidity!=null?parseFloat(h.humidity):null;
+    else if(m.key==="pres")val=h.pressure!=null?parseFloat(h.pressure):null;
+    else if(m.key==="cloud")val=h.cloud!=null?parseFloat(h.cloud):null;
+    else if(m.key==="vis")val=h.visibility!=null?parseFloat(h.visibility)*1000:null;
+    else if(m.key==="dir")val=h.wind_direction_degree!=null?parseFloat(h.wind_direction_degree):null;
+    else if(m.key==="uv")val=h.uv_index!=null?parseFloat(h.uv_index):null;
+    if(val!=null){
+      const w=effWeight("seniverse");
+      out.push({name:"心知天气 Seniverse · 中国",color:"#ff2d55",val:fmtVal(m,val),w:w,pc:0});
+    }
+  }
+  // normalize and percent
+  const tot=out.reduce((a,b)=>a+b.w,0)||1;
+  out.forEach(s=>s.w=Math.round(s.w/tot*100));
+  out.sort((a,b)=>b.w-a.w);
+  out.forEach(s=>s.pc=Math.max(6,s.w));
+  return out;
+}
+function fmtVal(m,v){
+  if(v==null)return "—";
+  if(m.key==="prob")return Math.round(v)+"%";
+  if(m.key==="precip")return v.toFixed(1)+" mm";
+  if(m.key==="vis")return (v/1000).toFixed(1)+" km";
+  if(m.key==="temp"||m.key==="feels")return Math.round(v)+"°";
+  if(m.key==="wind"||m.key==="gust")return Math.round(v)+" km/h";
+  if(m.key==="hum"||m.key==="cloud")return Math.round(v)+"%";
+  if(m.key==="pres")return Math.round(v)+" hPa";
+  if(m.key==="dir")return windDirText(v);
+  if(m.key==="uv")return uvText(v);
+  return v;
+}
+
+function renderSources(){
+  const box=$("#srcOverview");box.innerHTML="";
+  // 1) LIVE sources — those with real per-hour values blended into the composite
+  D.models.forEach(mod=>{
+    const w=Math.round(effWeight(mod.key)/liveWeightSum()*100);
+    const curT=mod.temp[D.startIdx]!=null?Math.round(mod.temp[D.startIdx])+"°":"—";
+    const curP=D.precipProb[D.startIdx]!=null?Math.round(D.precipProb[D.startIdx]*100)+"%":"—";
+    box.appendChild(so(mod.name,mod.country,mod.org,mod.color,curT+" / "+curP,w,null));
+  });
+  if(useQW){
+    const w=Math.round(effWeight("qweather")/liveWeightSum()*100);
+    box.appendChild(so("和风天气 QWeather","中国","实时接入","#007aff",(useQW.now.temp+"° / "+(useQW.now.precip||"0")+"mm"),w,null));
+  }
+  if(useSX){
+    const w=Math.round(effWeight("seniverse")/liveWeightSum()*100);
+    box.appendChild(so("心知天气 Seniverse","中国","实时接入","#ff2d55",((useSX.now.temperature!=null?useSX.now.temperature:"?")+"° / "+(useSX.now.visibility!=null?useSX.now.visibility:"?")+"km"),w,null));
+  }
+  // 2) PRIOR-only references — cannot fetch from a browser, only contribute to confidence
+  const priorItems=DOMESTIC.filter(d=>d.ref);
+  if(priorItems.length){
+    const div=document.createElement("div");
+    div.className="src-divider";
+    div.innerHTML='<span>先验权重 · 不直连</span><small>这些源没有可从浏览器调用的公开接口，因此仅其先验权重参与下方置信度评估，不进入逐时综合值计算。</small>';
+    box.appendChild(div);
+    const priorTot=priorItems.reduce((a,d)=>a+d.prior,0)||1;
+    priorItems.forEach(d=>{
+      const w=Math.round(d.prior/priorTot*100);
+      box.appendChild(so(d.name,d.country,d.org,d.color,d.note,w,"不直连"));
+    });
+  }
+  // 3) Confidence score
+  const conf=computeConfidence();
+  const confEl=document.createElement("div");
+  confEl.className="conf-box";
+  confEl.innerHTML='<div class="conf-head">整体置信度 <b>'+conf.score+'%</b><span style="color:var(--label);font-weight:500;font-size:11px">基于多源一致性 + 先验支撑</span></div>'+
+    '<div class="conf-detail">计算公式：<code>50 ＋ 直连数×5 − 温度σ×4 ＋ 先验权重和×100</code><br>当前输入：直连 <b>'+conf.liveN+'</b> · 温度离散 σ <b>'+conf.stdev.toFixed(2)+'°</b> · 先验权重和 <b>'+(conf.priorSum*100).toFixed(0)+'%</b><br>= <b>'+conf.score+'%</b></div>';
+  box.appendChild(confEl);
+
+  // 4) srcNote — full weights audit + formula + sources rationale
+  $("#srcNote").innerHTML=
+    "<b>综合公式</b>：综合值 = Σ(<b>直连源</b>实时数值 × 有效权重) ÷ Σ有效权重。"+
+    "有效权重 = 先验可信度 × 校准因子。校准因子 = 1 ÷ (EMA误差² + 0.4)，由「校准」面板的实测记录驱动，记录越多越准。"+
+    "<br><br><b>权重明细</b>（默认无校准时，按先验归一化）：<br>"+weightBreakdown()+
+    "<br><br><b>先验权重依据</b>（公开准确率评测）："+
+    "<br>· 国际（11 个全球/洲际 NWP 中心，Open-Meteo models= 确定性集合）：ECMWF IFS 0.04°(0.20) · IFS025 0.25°(0.17) · AIFS AI 模式(0.16) · ICON 德国(0.16) · UKMO 英国(0.12) · KMA 韩国(0.10) · JMA 日本(0.10) · ARPEGE 法国(0.08) · GFS 美国(0.08) · GEM 加拿大(0.06) · METNO 挪威(0.05)"+
+    "<br>· 国内可直连（浏览器 fetch，需 KEY）：和风 QWeather — Apple 中国数据源(0.11) · 心知 Seniverse — 实时+指数(0.09) · 彩云 — 分钟级降水(0.07)" +
+    "<br>· 国内不可直连：CMA GRAPES 中国区降水 >10mm 阈值优于 ECMWF(0.13) · 墨迹 2024 全球第一 24h 误差≈0.8°C(0.10) · MSN 微软多模型聚合(0.06)"+
+    "<br><br><b>关于「不直连」</b>：CMA/墨迹/MSN 均没有可从浏览器调用的公开 CORS 接口，因此无法获取它们的原始逐时数据。其先验权重仅用于置信度评估，<b>不</b>进入逐时综合值计算。要获得真实国内源数据，请在数据设置面板填入 <b>彩云 KEY</b> / <b>和风 KEY</b> / <b>心知 KEY</b>（三者都支持浏览器直连）。";
+}
+function so(name,country,org,color,dt,wk,ref){
+  const el=document.createElement("div");el.className="so";
+  const nm=name+(country?(" · "+country):"");
+  el.innerHTML='<div class="badge" style="background:'+color+'">'+(name||"").slice(0,2)+'</div>'+
+    '<div class="info"><div class="nm">'+nm+(ref?'<span class="ref">'+ref+'</span>':'')+'</div>'+
+    '<div class="dt">'+org+' · '+dt+'</div></div>'+
+    '<div class="wk">'+wk+'%</div>';
+  return el;
+}
+
+/* ---------- calibration view ---------- */
+function renderWeights(){
+  const list=$("#wtList");list.innerHTML="";
+  const all=[];
+  D.models&&D.models.forEach(m=>all.push({name:m.name,key:m.key,color:m.color}));
+  if(useQW)all.push({name:"和风天气",key:"qweather",color:"#007aff"});
+  DOMESTIC.forEach(d=>all.push({name:d.name,key:d.key,color:d.color}));
+  const tot=all.reduce((a,b)=>a+effWeight(b.key),0)||1;
+  all.sort((a,b)=>effWeight(b.key)-effWeight(a.key));
+  all.forEach(s=>{
+    const pc=Math.round(effWeight(s.key)/tot*100);
+    const w=document.createElement("div");w.className="w";
+    w.innerHTML='<div class="nm">'+s.name+'</div><div class="track"><i style="width:'+pc+'%"></i></div><div class="pc">'+pc+'%</div>';
+    list.appendChild(w);
+  });
+}
+let calRain=0;
+function setupCal(){
+  $$("#calRainSeg button").forEach(b=>b.onclick=()=>{
+    $$("#calRainSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");calRain=+b.dataset.v;
+  });
+  $("#calSave").onclick=()=>{
+    const t=parseFloat($("#calTemp").value),p=parseFloat($("#calPrec").value);
+    if(isNaN(t)){toast("请输入实况气温");return;}
+    const i=D.startIdx;
+    // update each model's temp & precip EMA
+    D.models.forEach(m=>{
+      const f=m.temp[i];if(f==null)return;
+      const key=m.key;let c=ST.cal[key]||{tempEma:0,precEma:0,n:0};
+      c.tempEma=c.tempEma*0.7+Math.abs(f-t)*0.3;c.n++;ST.cal[key]=c;
+    });
+    useQW&&useQW.hourly&&useQW.hourly[i]&&(()=>{const f=parseFloat(useQW.hourly[i].temp);if(!isNaN(f)){let c=ST.cal.qweather||{tempEma:0};c.tempEma=c.tempEma*0.7+Math.abs(f-t)*0.3;ST.cal.qweather=c;}})();
+    if(!isNaN(p)){
+      D.models.forEach(m=>{
+        const f=m.precip[i]||0;const key=m.key;let c=ST.cal[key]||{tempEma:0,precEma:0,n:0};
+        c.precEma=c.precEma*0.7+Math.abs((f>=0.1?1:0)-(p>=0.1?1:0))*0.3;ST.cal[key]=c;
+      });
+    }
+    save();renderWeights();renderSources();renderDetail();toast("已保存，权重已更新");
+  };
+  $("#calReset").onclick=()=>{ST.cal={};save();renderWeights();renderSources();renderDetail();toast("校准已重置");};
+}
+
+/* ---------- location ---------- */
+let map,marker,mapReady=false;
+function initMap(){
+  if(mapReady)return;
+  if(typeof L==="undefined"){toast("地图组件加载失败，请检查网络");return;}
+  map=L.map("map",{maxBounds:[[3,73],[54,135]],maxBoundsViscosity:.7,worldCopyJump:false}).setView([ST.lastLat||APP.lat,ST.lastLng||APP.lng],ST.lastLat?6:4);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(map);
+  marker=L.marker([ST.lastLat||APP.lat,ST.lastLng||APP.lng],{draggable:true}).addTo(map);
+  marker.on("dragend",()=>{const ll=marker.getLatLng();reverse(ll.lat,ll.lng);});
+  map.on("click",e=>{marker.setLatLng(e.latlng);reverse(e.latlng.lat,e.latlng.lng);});
+  mapReady=true;
+  setTimeout(()=>map.invalidateSize(),200);
+}
+async function reverse(lat,lng){
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18");
+    const j=await r.json();
+    ST.mapLat=lat;ST.mapLng=lng;save();
+    $("#mapAddr").textContent=j.display_name||(lat.toFixed(4)+", "+lng.toFixed(4));
+  }catch(e){$("#mapAddr").textContent=lat.toFixed(4)+", "+lng.toFixed(4);}
+}
+async function geoSearch(q){
+  const res=$("#geoRes");res.innerHTML='<div style="color:var(--label)">搜索中…</div>';
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=6&accept-language=zh-CN&q="+encodeURIComponent(q));
+    const j=await r.json();
+    if(!j.length){res.innerHTML='<div style="color:var(--label)">未找到，换关键词试试</div>';return;}
+    res.innerHTML="";
+    j.forEach(p=>{
+      const d=document.createElement("div");
+      d.textContent=p.display_name;
+      d.onclick=()=>{setLoc(+p.lat,+p.lon,p.display_name.split(",")[0],p.display_name);switchView("v-weather");};
+      res.appendChild(d);
+    });
+  }catch(e){res.innerHTML='<div style="color:var(--red)">搜索失败（需联网）</div>';}
+}
+function setLoc(lat,lng,name,sub){
+  ST.lastLat=lat;ST.lastLng=lng;ST.lastName=name;ST.lastSub=sub||"";save();
+  APP.lat=lat;APP.lng=lng;APP.name=name;APP.sub=sub||"";
+  $("#locName").innerHTML=name+'<small>'+(sub||"")+'</small>';
+  loadAll();
+}
+function renderSaved(){
+  const box=$("#savedList");box.innerHTML="";
+  if(!ST.saved.length){box.innerHTML='<div class="note">还没有保存的位置。</div>';return;}
+  ST.saved.forEach((s,idx)=>{
+    const el=document.createElement("div");el.className="sv";
+    el.innerHTML='<div style="flex:1"><div class="sn">'+s.name+'</div><div class="sd">'+s.sub+'</div></div>'+
+      '<div class="x" data-i="'+idx+'">删除</div>';
+    el.querySelector(".sn").onclick=()=>setLoc(s.lat,s.lng,s.name,s.sub);
+    el.querySelector(".x").onclick=(e)=>{e.stopPropagation();ST.saved.splice(idx,1);save();renderSaved();};
+    box.appendChild(el);
+  });
+}
+function setupLoc(){
+  $$(".ltab").forEach(t=>t.onclick=()=>{
+    $$(".ltab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
+    const which=t.dataset.t;
+    $("#locSearch").style.display=which==="search"?"block":"none";
+    $("#locManual").style.display=which==="manual"?"block":"none";
+    $("#locMap").style.display=which==="map"?"block":"none";
+    if(which==="map")initMap();
+  });
+  $("#geoBtn").onclick=()=>{const q=$("#geoQ").value.trim();if(q)geoSearch(q);};
+  $("#geoQ").addEventListener("keydown",e=>{if(e.key==="Enter")$("#geoBtn").click();});
+  $("#manUse").onclick=()=>{
+    const lat=parseFloat($("#manLat").value),lng=parseFloat($("#manLng").value);
+    let la=lat,ln=lng;
+    if(isNaN(lat)&&$("#manLat").value.includes(",")){const p=$("#manLat").value.split(",");la=parseFloat(p[0]);ln=parseFloat(p[1]);}
+    const w=$("#manWarn");
+    if(isNaN(la)||isNaN(ln)){w.textContent="请输入有效的纬度/经度";return;}
+    if(la<3||la>54||ln<73||ln>135){w.textContent="超出中国范围（纬度 3–54，经度 73–135）";return;}
+    w.textContent="";setLoc(la,ln,"自定义 "+la.toFixed(2)+","+ln.toFixed(2),"手动定位");switchView("v-weather");
+  };
+  $("#mapUse").onclick=()=>{
+    const lat=ST.mapLat!=null?ST.mapLat:(ST.lastLat||APP.lat);
+    const lng=ST.mapLng!=null?ST.mapLng:(ST.lastLng||APP.lng);
+    setLoc(lat,lng,ST.lastName||"地图选点",$("#mapAddr").textContent);switchView("v-weather");
+  };
+}
+
+/* ---------- view switch ---------- */
+function switchView(v){
+  $$(".view").forEach(s=>s.classList.remove("active"));
+  $("#"+v).classList.add("active");
+  $$(".navbtn").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="v-cal")renderWeights();
+  if(v==="v-loc")renderSaved();
+  window.scrollTo(0,0);
+}
+function setupNav(){
+  $$(".navbtn").forEach(b=>b.onclick=()=>switchView(b.dataset.v));
+}
+
+/* ---------- backup sheet ---------- */
+function setupSheet(){
+  $("#btnBackup").onclick=()=>{$("#qkey").value=ST.qkey||"";$("#ckey").value=ST.ckey||"";$("#sxkey").value=ST.sxkey||"";$("#scrim").classList.add("on");$("#sheet").classList.add("on");};
+  $("#closeSheet").onclick=closeSheet;
+  $("#scrim").onclick=closeSheet;
+  $("#saveKey").onclick=()=>{ST.qkey=$("#qkey").value.trim();ST.ckey=$("#ckey").value.trim();ST.sxkey=$("#sxkey").value.trim();save();closeSheet();toast("密钥已保存，刷新生效");};
+  $("#expBtn").onclick=()=>{
+    const blob=new Blob([JSON.stringify(ST,null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="weather-workbench-backup.json";a.click();toast("已导出备份");
+  };
+  $("#impBtn").onclick=()=>$("#impFile").click();
+  $("#impFile").onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{try{const j=JSON.parse(rd.result);ST=Object.assign(ST,j);save();closeSheet();toast("已导入，刷新生效");}catch(err){toast("文件无效");}};
+    rd.readAsText(f);
+  };
+  $("#clrBtn").onclick=()=>{
+    if(confirm("确定清空全部数据（位置、校准、密钥、备份）？此操作不可恢复。")){
+      localStorage.removeItem(LS+"state");toast("已清空");closeSheet();location.reload();
+    }
+  };
+}
+function closeSheet(){$("#scrim").classList.remove("on");$("#sheet").classList.remove("on");}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),1600);}
+
+/* ---------- drag-to-scroll (mouse + touch) for horizontal strips ---------- */
+function enableDragScroll(el){
+  if(!el||el.__dragBound)return;el.__dragBound=true;
+  let isDown=false,startX=0,startScroll=0,moved=false;
+  const xOf=e=>e.touches&&e.touches[0]?e.touches[0].pageX:(e.pageX!=null?e.pageX:e.clientX);
+  const onDown=x=>{isDown=true;moved=false;startX=x;startScroll=el.scrollLeft;el.classList.add("dragging");};
+  const onMove=x=>{if(!isDown)return;const dx=x-startX;if(Math.abs(dx)>4)moved=true;if(moved)el.scrollLeft=startScroll-dx;};
+  const onUp=()=>{isDown=false;el.classList.remove("dragging");};
+  el.addEventListener("mousedown",e=>{if(e.button)return;onDown(xOf(e));e.preventDefault();});
+  window.addEventListener("mousemove",e=>{if(isDown)onMove(xOf(e));});
+  window.addEventListener("mouseup",onUp);
+  el.addEventListener("touchstart",e=>{if(e.touches.length===1)onDown(e.touches[0].pageX);},{passive:true});
+  el.addEventListener("touchmove",e=>{if(isDown&&e.touches.length===1)onMove(e.touches[0].pageX);},{passive:true});
+  el.addEventListener("touchend",onUp,{passive:true});
+  el.addEventListener("click",e=>{if(moved){e.stopPropagation();e.preventDefault();moved=false;}},true);
+}
+
+/* ---------- confidence + weight audit ---------- */
+function liveWeightSum(){
+  let t=0;D.models.forEach(m=>t+=effWeight(m.key));
+  if(useQW)t+=effWeight("qweather");
+  return t||1;
+}
+function computeConfidence(){
+  const liveN=D.models.length+(useQW?1:0)+(useSX?1:0);
+  const ts=[];
+  D.models.forEach(m=>{const v=m.temp[D.startIdx];if(v!=null)ts.push(v);});
+  if(useQW&&useQW.hourly&&useQW.hourly[D.startIdx]){
+    const v=parseFloat(useQW.hourly[D.startIdx].temp);if(!isNaN(v))ts.push(v);
+  }
+  if(useSX&&useSX.now&&useSX.now.temperature!=null){
+    const v=parseFloat(useSX.now.temperature);if(!isNaN(v))ts.push(v);
+  }
+  const mean=ts.length?ts.reduce((a,b)=>a+b,0)/ts.length:0;
+  const variance=ts.length?ts.reduce((a,b)=>a+(b-mean)*(b-mean),0)/ts.length:0;
+  const stdev=Math.sqrt(variance);
+  const priorSum=DOMESTIC.filter(d=>d.ref).reduce((a,d)=>a+d.prior,0); // 0.13+0.10+0.07+0.06=0.36
+  const score=Math.max(35,Math.min(99,Math.round(50+liveN*5-stdev*4+priorSum*100)));
+  return {score,liveN,stdev,priorSum,
+    detail:`基线 50 ＋ 直连数 ${liveN} × 5 − 温度离散 ${stdev.toFixed(1)}° × 4 ＋ 先验权重和 ${(priorSum*100).toFixed(0)}%`};
+}
+function weightBreakdown(){
+  // default (no calibration): normalized % of priors
+  const items=[];
+  MODELS.forEach(m=>items.push({name:m.name,key:m.key,prior:m.prior,live:true}));
+  if(useQW)items.push({name:"和风天气 QWeather",key:"qweather",prior:DOMESTIC.find(d=>d.key==="qweather").prior,live:true});
+  if(D.models.find(m=>m.key==="caiyun"))items.push({name:"彩云天气",key:"caiyun",prior:0.07,live:true});
+  if(useSX)items.push({name:"心知天气 Seniverse",key:"seniverse",prior:DOMESTIC.find(d=>d.key==="seniverse").prior,live:true});
+  DOMESTIC.filter(d=>d.ref).forEach(d=>items.push({name:d.name,key:d.key,prior:d.prior,live:false}));
+  const tot=items.reduce((a,b)=>a+b.prior,0);
+  return items.map(it=>`${it.name}${it.live?"":"·不直连"} ${(it.prior/tot*100).toFixed(1)}%`).join(" · ");
+}
+
+/* ---------- main load ---------- */
+let loading=false;
+async function loadAll(){
+  if(loading)return;loading=true;
+  $("#heroCondSub").textContent="数据加载中…";
+  const t0=performance.now();
+  const srcLabel=await syncTime();
+  const lat=APP.lat,lng=APP.lng;
+  try{
+    const [modsP,ensP,fcP,miniP,qwP,cyP,sxP]=await Promise.allSettled([
+      fetchModels(lat,lng),fetchEnsemble(lat,lng),fetchForecast(lat,lng),fetchMinutely(lat,lng),
+      fetchQWeather(lat,lng,ST.qkey),fetchCaiyun(lat,lng,ST.ckey),fetchSeniverse(lat,lng,ST.sxkey)
+    ]);
+    let mp=modsP.status==="fulfilled"?modsP.value:null;
+    let ens=ensP.status==="fulfilled"?ensP.value:null;
+    let fc=fcP.status==="fulfilled"?fcP.value:null;
+    let mini=miniP.status==="fulfilled"?miniP.value:null;
+    useQW=qwP.status==="fulfilled"?qwP.value:null;
+    useCY=cyP.status==="fulfilled"?cyP.value:null;
+    useSX=sxP.status==="fulfilled"?sxP.value:null;
+
+    if(!fc){toast("数据获取失败，请检查网络");loading=false;return;}
+    const ftime=fc.hourly.time;
+    const nowStr=now();
+    const curH=nowStr.getHours();
+    let startIdx=ftime.findIndex(t=>parseInt(t.slice(11,13),10)>=curH);
+    if(startIdx<0)startIdx=ftime.length-1;
+
+    let models=[],precipProb=[];
+    if(mp){
+      const pm=parseModels(mp);
+      D.time=pm.time;models=pm.models;
+      if(ens){try{precipProb=parseEnsembleProb(ens);}catch(e){precipProb=[];}}
+      if(!precipProb.length){
+        precipProb=ftime.map((_,i)=>{let c=0,n=0;models.forEach(m=>{if(m.precip[i]!=null){n++;if(m.precip[i]>=0.1)c++;}});return n?c/n:0;});
+      }
+      D.precipProb=precipProb;
+    }else{
+      D.time=ftime;
+      D.precipProb=fc.hourly.precipitation_probability?fc.hourly.precipitation_probability.map(v=>(v||0)/100):fc.hourly.precipitation.map(v=>v>0?1:0);
+      const mk=(temp,precip,wind,hum,pres,cloud,vis)=>({key:"om",name:"Open-Meteo",org:"综合模式",prior:1,color:"#0a84ff",temp,precip,wind,hum,pres,cloud,vis});
+      models=[mk(fc.hourly.temperature_2m,fc.hourly.precipitation,fc.hourly.wind_speed_10m,fc.hourly.relative_humidity_2m,fc.hourly.pressure_msl,fc.hourly.cloud_cover,fc.hourly.visibility)];
+    }
+    // Caiyun (real, browser-fetchable when KEY provided) → live source
+    if(useCY){
+      const cy=parseCaiyun(useCY,D.time);
+      if(cy){
+        models.push({key:"caiyun",name:"彩云天气",org:"分钟级降水",country:"中国",prior:0.07,color:"#34c759",
+          temp:cy.temp,precip:cy.precip,wind:cy.wind,hum:cy.hum,pres:cy.pres,cloud:cy.cloud,vis:cy.vis});
+      }
+    }
+    // Seniverse / 心知天气 (real, browser-fetchable when KEY provided) → live source
+    if(useSX){
+      const sx=parseSeniverse(useSX,D.time);
+      if(sx){
+        models.push({key:"seniverse",name:"心知天气 Seniverse",org:"实时+逐小时+指数",country:"中国",prior:0.09,color:"#ff2d55",
+          temp:sx.temp,precip:sx.precip,wind:sx.wind,gust:sx.gust,dir:sx.dir,hum:sx.hum,pres:sx.pres,cloud:sx.cloud,vis:sx.vis,uv:sx.uv});
+      }
+    }
+    // src label reflects live sources
+    const intlN=models.filter(m=>MODELS.find(x=>x.key===m.key)).length;
+    let lbl=intlN>1?("多源数值集合 · "+intlN+" 个国际模式"):"Open-Meteo 综合";
+    if(useCY&&models.find(m=>m.key==="caiyun"))lbl+=" · 彩云";
+    if(useQW)lbl+=" · 和风";
+    if(useSX&&models.find(m=>m.key==="seniverse"))lbl+=" · 心知";
+    D.srcLabel=lbl;
+    // composite per hour (includes caiyun if connected)
+    const composite=[];
+    const len=D.time.length;
+    for(let i=0;i<len;i++){
+      composite.push(blendMap(models,i));
+    }
+    // advance startIdx only past fully-empty leading hours (never skip the current hour)
+    for(let i=startIdx;i<composite.length;i++){
+      let c=0;for(const m of models){if(m.temp[i]!=null)c++;}
+      if(c>=1){startIdx=i;break;}
+    }
+    // hour weather code approximated from cloud/precip
+    const hourCode=new Array(len).fill(3);
+    for(let i=0;i<len;i++){
+      const c=composite[i];
+      if(c.precip&&c.precip>0.1)hourCode[i]=61;
+      else if(c.cloud>80)hourCode[i]=3;
+      else if(c.cloud>40)hourCode[i]=2;
+      else hourCode[i]=1;
+    }
+    D.models=models;
+    D.composite=composite;
+    D.hourCode=hourCode;
+    D.startIdx=startIdx;
+    D.current=fc.current;
+    D.daily=fc.daily;
+    // minutely
+    if(mini&&mini.minutely_15){
+      const mt=mini.minutely_15.time,mp=mini.minutely_15.precipitation||[];
+      const nowMs=nowStr.getTime();
+      D.mini=[];
+      for(let i=0;i<mt.length;i++){
+        const ts=new Date(mt[i].replace(" ","T")+"Z").getTime();
+        if(ts>=nowMs-60000)D.mini.push({t:mt[i],p:mp[i]||0});
+        if(D.mini.length>=8)break;
+      }
+    }else D.mini=null;
+    // QWeather override current temp if available
+    if(useQW&&useQW.now){
+      D.current.temperature_2m=parseFloat(useQW.now.temp);
+      D.current.apparent_temperature=parseFloat(useQW.now.feelsLike);
+      D.current.wind_speed_10m=parseFloat(useQW.now.windSpeed);
+    }
+    selHour=0;
+    render();
+  }catch(e){
+    console.error(e);toast("渲染出错："+e.message);
+  }
+  loading=false;
+}
+
+/* ---------- geolocation on first run ---------- */
+function boot(){
+  load();
+  setupNav();setupSheet();setupCal();setupLoc();
+  enableDragScroll($("#strip"));
+  // default location: last used
+  if(ST.lastLat!=null&&ST.lastLng!=null){
+    APP.lat=ST.lastLat;APP.lng=ST.lastLng;APP.name=ST.lastName||"位置";APP.sub=ST.lastSub||"";
+    $("#locName").innerHTML=APP.name+'<small>'+APP.sub+'</small>';
+  }else{
+    // try geolocation
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        APP.lat=pos.coords.latitude;APP.lng=pos.coords.longitude;
+        reverseLoc(APP.lat,APP.lng);
+      },()=>{ /* keep default */ },{timeout:8000});
+    }
+  }
+  // tick clock
+  setInterval(()=>{
+    const d=now();
+    $("#syncBox").innerHTML="时间 · "+syncLabel+'<br><b>'+fmtClock(d)+'</b>';
+  },1000);
+  loadAll();
+}
+let syncLabel="本机";
+async function tickSync(){
+  syncLabel=await syncTime();
+}
+function reverseLoc(lat,lng){
+  fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18")
+    .then(r=>r.json()).then(j=>{
+      const name=(j.address&&(j.address.city||j.address.town||j.address.county))||(j.display_name?j.display_name.split(",")[0]:"我的位置");
+      setLoc(lat,lng,name,j.display_name||"");
+    }).catch(()=>{$("#locName").innerHTML="已定位"+'<small>'+lat.toFixed(2)+","+lng.toFixed(2)+'</small>';});
+}
+
+// refresh every 10 min re-sync
+setInterval(()=>{syncTime().then(l=>syncLabel=l);},600000);
+document.addEventListener("DOMContentLoaded",()=>{syncTime().then(l=>syncLabel=l);boot();});
+})();
+</script>
+</body>
+</html>

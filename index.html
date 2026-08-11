@@ -36,7 +36,8 @@
   --shadow-hero:0 1px 2px rgba(0,0,0,.10),0 12px 40px rgba(0,0,0,.18),0 32px 80px rgba(0,0,0,.12);
   --shadow-hc:0 1px 1px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.05);
   /* 圆角（必须配 corner-shape: squircle 才接近 iOS 真实超椭圆） */
-  --r-card:22px;
+  --r-card:26px;
+  --r-hero:30px;
   --r-ctl:12px;
   --r-pill:999px;
   /* 字号表（HIG：SF Pro Display ≥20px，SF Pro Text <20px，所有数字 tabular-nums 强制等宽对齐） */
@@ -99,7 +100,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .sync b{color:var(--label);font-weight:500}
 
 /* ───── hero ───── */
-#hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:28px 22px 24px;border-radius:var(--r-card);box-shadow:var(--shadow-hero);transition:background .6s ease;backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);min-height:180px}
+#hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:28px 22px 24px;border-radius:var(--r-hero);box-shadow:var(--shadow-hero);transition:background .6s ease;backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);min-height:180px}
 #hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28));border-radius:inherit}
 .hero-in{position:relative;z-index:2}
 .hero-top{display:flex;justify-content:space-between;align-items:flex-start}
@@ -132,6 +133,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .chart-wrap{width:100%;overflow:hidden;position:relative}
 .chart-wrap svg{width:100%;height:auto;display:block;touch-action:none}
 .axis-label{fill:var(--tertiaryLabel);font-size:10px;font-weight:500;font-family:var(--font);font-variant-numeric:tabular-nums;letter-spacing:0}
+.unit-label{fill:var(--secondaryLabel);font-size:11px;font-weight:600;letter-spacing:.3px;opacity:.85}
 .grid-line{stroke:var(--separator);stroke-width:.6}
 .axis-line{stroke:var(--opaqueSeparator);stroke-width:.8}
 .cvline{position:absolute;top:0;width:1px;background:var(--secondaryLabel);opacity:0;pointer-events:none;transition:opacity .12s}
@@ -395,6 +397,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     <div class="card">
       <div class="loc-tabs">
         <div class="ltab on" data-t="search">搜索</div>
+        <div class="ltab" data-t="auto">📍 自动定位</div>
         <div class="ltab" data-t="manual">手动输入</div>
         <div class="ltab" data-t="map">地图</div>
       </div>
@@ -405,6 +408,13 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
         </div>
         <div class="res" id="geoRes"></div>
         <div class="note">数据来自 OpenStreetMap，仅限中国范围。点选结果即定位。</div>
+      </div>
+      <div id="locAuto" style="display:none;text-align:center;padding:14px 0 4px">
+        <div style="font-size:48px;line-height:1;margin-bottom:10px">📍</div>
+        <div style="font-size:15px;font-weight:600;margin-bottom:6px">使用浏览器定位</div>
+        <div style="font-size:13px;color:var(--secondaryLabel);margin-bottom:14px;line-height:1.5">点击下方按钮，浏览器将请求 GPS 坐标并自动逆解析为地名，加载该位置的预报。</div>
+        <button class="btn" id="locBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;background:var(--systemIndigo);color:#fff">📍 获取当前位置</button>
+        <div id="locAutoMsg" style="margin-top:10px;font-size:12px;color:var(--secondaryLabel);min-height:16px"></div>
       </div>
       <div id="locManual" style="display:none">
         <div class="field"><input id="manLat" placeholder="纬度 lat，如 31.2304"><button class="btn" id="manUse">定位</button></div>
@@ -516,13 +526,13 @@ function fmtLocal(d){const p=n=>String(n).padStart(2,"0");return d.getFullYear()
    8 家国际 NWP 中心：METNO（挪威）已移除——其 2.5km 网格只覆盖北欧，中国境内无本地嵌套。
    法国、加拿大此前已移除。本版权重完全依据「中国本土公开评测」分配。 */
 const MODELS=[
-  {req:"ecmwf_ifs04",key:"ecmwf",name:"ECMWF IFS",org:"欧洲中心 0.04°",country:"欧洲",prior:.20,color:"#5856d6"},
+  {req:"ecmwf_ifs",key:"ecmwf",name:"ECMWF IFS",org:"欧洲中心 0.1°",country:"欧洲",prior:.20,color:"#5856d6"},
   {req:"ecmwf_ifs025",key:"ecmwf025",name:"ECMWF IFS025",org:"欧洲中心 0.25°",country:"欧洲",prior:.17,color:"#5856d6"},
   {req:"ecmwf_aifs025",key:"aifs",name:"ECMWF AIFS",org:"欧洲中心 AI",country:"欧洲",prior:.10,color:"#64d2ff"},
   {req:"icon_seamless",key:"icon",name:"ICON",org:"德国 DWD",country:"德国",prior:.10,color:"#32ade6"},
   {req:"kma_seamless",key:"kma",name:"KMA",org:"韩国气象厅",country:"韩国",prior:.13,color:"#ff9500"},
   {req:"ukmo_seamless",key:"ukmo",name:"UKMO",org:"英国气象局",country:"英国",prior:.09,color:"#ff3b30"},
-  {req:"jma_seamless",key:"jma",name:"JMA",org:"日本气象厅",country:"日本",prior:.14,color:"#34c759"},
+  {req:"jma_msm",key:"jma",name:"JMA MSM",org:"日本气象厅",country:"日本",prior:.14,color:"#34c759"},
   {req:"gfs_seamless",key:"gfs",name:"GFS",org:"美国 NCEP",country:"美国",prior:.07,color:"#8e8e93"}
 ];
 /* 国内源（仅当用户填了密钥才实时接入，否则不在综合里） */
@@ -887,8 +897,8 @@ function lineChart(opts){
     grid+='<line class="grid-line" x1="'+L+'" y1="'+yr.toFixed(1)+'" x2="'+(W-R)+'" y2="'+yr.toFixed(1)+'"/>';
     grid+='<text class="axis-label" x="'+(L-6)+'" y="'+(yr+3.5).toFixed(1)+'" text-anchor="end">'+v+'</text>';
   });
-  /* 单位：放到绘图区右上角内（远离纵轴标签所在列） */
-  grid+='<text class="axis-label unit-label" x="'+(W-R-2)+'" y="'+(T+10).toFixed(1)+'" text-anchor="end">'+opts.yunit+'</text>';
+  /* 单位：左上角小标签（远离数据线，不与纵轴重叠） */
+  grid+='<text class="axis-label unit-label" x="'+(L+2)+'" y="'+(T-6).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
   /* x 轴：均匀 6 个标签 */
   let xl="";
   const xstep=Math.max(1,Math.floor(n/6));
@@ -940,8 +950,8 @@ function barChart(opts){
     grid+='<line class="grid-line" x1="'+L+'" y1="'+yr.toFixed(1)+'" x2="'+(W-R)+'" y2="'+yr.toFixed(1)+'"/>';
     grid+='<text class="axis-label" x="'+(L-6)+'" y="'+(yr+3.5).toFixed(1)+'" text-anchor="end">'+v+'</text>';
   });
-  /* 单位：放到绘图区右上角内（远离纵轴标签所在列） */
-  grid+='<text class="axis-label unit-label" x="'+(W-R-2)+'" y="'+(T+10).toFixed(1)+'" text-anchor="end">'+opts.yunit+'</text>';
+  /* 单位：左上角小标签（远离数据线，不与纵轴重叠） */
+  grid+='<text class="axis-label unit-label" x="'+(L+2)+'" y="'+(T-6).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
   let bars="",xl="";
   const xstep=Math.max(1,Math.floor(n/6));
   const gid=opts.gradient?("bg"+Math.random().toString(36).slice(2,8)):null;
@@ -1201,7 +1211,7 @@ function fmtVal(m,v){
   if(v==null)return "—";
   if(m.key==="prob")return Math.round(v)+"%";
   if(m.key==="precip")return v.toFixed(1)+" mm";
-  if(m.key==="vis")return (v/1000).toFixed(1)+" km";
+  if(m.key==="vis")return v<1000?Math.round(v)+" m":(v/1000).toFixed(1)+" km";
   if(m.key==="temp"||m.key==="feels")return Math.round(v)+"°";
   if(m.key==="wind"||m.key==="gust")return Math.round(v)+" km/h";
   if(m.key==="hum"||m.key==="cloud")return Math.round(v)+"%";
@@ -1344,7 +1354,53 @@ async function geoSearch(q){
     });
   }catch(e){res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';}
 }
-function setLoc(lat,lng,name,sub){
+/* 自动定位：浏览器 GPS → 反查地名 → 加载预报 */
+function locateMe(){
+  const btn=$("#locBtn"),msg=$("#locAutoMsg");
+  if(!navigator.geolocation){
+    msg.textContent="当前浏览器不支持定位 API";
+    msg.style.color="var(--systemRed)";
+    return;
+  }
+  btn.disabled=true;
+  const origTxt=btn.textContent;
+  btn.textContent="定位中…";
+  msg.textContent="正在获取 GPS 坐标…";
+  msg.style.color="var(--secondaryLabel)";
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const la=+pos.coords.latitude.toFixed(4),ln=+pos.coords.longitude.toFixed(4);
+      msg.textContent="已获取坐标 "+la+", "+ln+"（精度 "+Math.round(pos.coords.accuracy||0)+" m），正在反查地址…";
+      /* 反查地名 → 加载预报 */
+      fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14")
+        .then(r=>r.json()).then(j=>{
+          const dn=j.display_name||"";
+          const nm=j.address&&(j.address.city||j.address.town||j.address.county||j.address.province||j.address.state)||dn.split(",")[0]||("当前位置");
+          setLoc(la,ln,nm,dn);
+          btn.disabled=false;btn.textContent=origTxt;
+          msg.textContent="";
+          switchView("v-weather");
+          toast("已定位到 "+nm);
+        }).catch(()=>{
+          /* 反查失败也用坐标定位 */
+          setLoc(la,ln,"当前位置","");
+          btn.disabled=false;btn.textContent=origTxt;
+          msg.textContent="";
+          switchView("v-weather");
+          toast("已定位到当前位置");
+        });
+    },
+    err=>{
+      btn.disabled=false;btn.textContent=origTxt;
+      msg.style.color="var(--systemRed)";
+      if(err.code===1)msg.textContent="定位被拒绝：请在浏览器设置中允许位置权限";
+      else if(err.code===2)msg.textContent="定位不可用：设备无法获取位置";
+      else if(err.code===3)msg.textContent="定位超时：请到室外或信号好的位置重试";
+      else msg.textContent="定位失败："+(err.message||"未知错误");
+    },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
+  );
+}
   ST.lastLat=lat;ST.lastLng=lng;ST.lastName=name;ST.lastSub=sub||"";save();
   APP.lat=lat;APP.lng=lng;APP.name=name;APP.sub=sub||"";
   $("#locLName").textContent=name;
@@ -1399,10 +1455,12 @@ function setupLoc(){
     $$(".ltab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
     const which=t.dataset.t;
     $("#locSearch").style.display=which==="search"?"block":"none";
+    $("#locAuto").style.display=which==="auto"?"block":"none";
     $("#locManual").style.display=which==="manual"?"block":"none";
     $("#locMap").style.display=which==="map"?"block":"none";
     if(which==="map")initMap();
   });
+  $("#locBtn").onclick=locateMe;
   $("#geoBtn").onclick=()=>{const q=$("#geoQ").value.trim();if(q)geoSearch(q);};
   $("#geoQ").addEventListener("keydown",e=>{if(e.key==="Enter")$("#geoBtn").click();});
   $("#manUse").onclick=()=>{

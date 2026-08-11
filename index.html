@@ -5,13 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>天气台</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&amp;display=swap" rel="stylesheet">
 <style>
 /* ───── design tokens（HIG-aligned: 3 档文字 + 3 档背景 + 1 档分隔） ───── */
 :root{
   /* system colors（Apple HIG 命名，仅 3 档文字，禁止 #666/#333 等中间灰） */
   --label:#1c1c1e;
-  --secondaryLabel:#3c3c43;
-  --tertiaryLabel:#8e8e93;
+  --secondaryLabel:#2c2c2e;
+  --tertiaryLabel:#48484a;
   /* system backgrounds（同样是 3 档） */
   --systemBackground:#ffffff;
   --secondarySystemBackground:#f2f2f7;
@@ -37,8 +40,8 @@
   --r-ctl:12px;
   --r-pill:999px;
   /* 字号表（HIG：SF Pro Display ≥20px，SF Pro Text <20px，所有数字 tabular-nums 强制等宽对齐） */
-  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  --font-num:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC",ui-monospace,Menlo,Consolas,monospace;
+  --font:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --font-num:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC",ui-monospace,Menlo,Consolas,monospace;
   --t-title:34px;
   --t-hero:96px;
   --t-h1:22px;
@@ -65,11 +68,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 input,select{font-family:inherit;font-size:16px}
 
 /* ───── squircle fallback + modern（Apple 真实超椭圆） ───── */
-.sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet,#hero{
+.sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,.conf-box,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet,#hero{
   border-radius:var(--r-card);
 }
 @supports (corner-shape: squircle){
-  .sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet,#hero{
+  .sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,.conf-box,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet,#hero{
     corner-shape:squircle;
   }
 }
@@ -221,6 +224,7 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .sv .sd{font-size:var(--t-cap);color:var(--secondaryLabel)}
 .sv .x{color:var(--systemRed);font-size:var(--t-callout);font-weight:600;padding:4px}
 .note{font-size:12px;color:var(--secondaryLabel);line-height:1.6;margin-top:6px}
+.evid{padding:11px 13px;background:rgba(88,86,214,.07);border-left:3px solid var(--systemIndigo);border-radius:var(--r-ctl);margin:10px 0 4px;color:var(--label);font-size:13px;line-height:1.65;font-weight:400}
 .warn{color:var(--systemRed);font-size:12px;margin-top:6px;min-height:14px}
 
 /* ───── calibrate ───── */
@@ -283,7 +287,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 .vw-p{width:48px;text-align:right;font-weight:700;color:var(--systemIndigo);font-family:var(--font-num);flex:0 0 auto}
 </style>
 </head>
-<body><!-- build 2026-08-11-v10 China-local weights + Apple squircle + saved-location quick-switch -->
+<body><!-- build 2026-08-11-v14 Apple HIG: Inter numerals, no gray text, squircle on all modules, distance-sorted search, always-visible save button, user-facing source/weight copy -->
 <div id="app">
   <header>
     <div class="hrow">
@@ -357,9 +361,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 
     <div class="card">
       <h3>逐变量权重</h3>
-      <div class="note">同一家预报中心在不同的天气项目上强弱不一样，所以我们按「气温」「降水」「风速」等逐项给每家一个权重，下面是默认权重（您记录过实测后会自动调整）。</div>
+      <div class="note">同一家预报中心在不同的天气项目上强弱不一样，所以我们按「气温」「降水」「风速」等逐项给每家一个权重，下面是默认权重（记录过实测后会自动调整）。</div>
       <select id="varSel" class="vsel"></select>
-      <div class="note" id="varEvid" style="margin:8px 0 4px;color:var(--secondaryLabel);font-size:var(--t-cap)"></div>
+      <div class="evid" id="varEvid"></div>
       <div id="varWeights"></div>
     </div>
   </section>
@@ -368,7 +372,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
   <section class="view" id="v-cal">
     <div class="card">
       <h3>实测校准</h3>
-      <div class="note">把你所在地的实况天气填进来（比如「26.5°C、无雨」），系统会按各源的偏差自动调整权重。记录越多，综合越准。</div>
+      <div class="note">将所在地实况天气填入（比如「26.5°C、无雨」），系统会按各源的偏差自动调整权重。记录越多，综合越准。</div>
       <div class="cal-input" style="margin-top:12px">
         <div class="ci"><label>实况气温 (°C)</label><input type="number" id="calTemp" placeholder="如 26.5" step="0.1"></div>
         <div class="ci"><label>实况降水量 (mm)</label><input type="number" id="calPrec" placeholder="0 或 0.8" step="0.1"></div>
@@ -554,16 +558,16 @@ const SKILL={
 };
 const VAR_LABEL={temp:"气温",precip:"降水量",wind:"风速",gust:"最大瞬时风速",dir:"风向",hum:"湿度",pres:"气压",cloud:"云量",vis:"能见度",uv:"紫外线强度"};
 const VAR_EVID={
-  temp:"依据：2421 个国家级自动站 2010–2013 实测（龚伟伟等，气候与环境研究）——地面温度 ECMWF 最优，JMA 次之，GFS 在夏季偏差最大。",
-  precip:"依据：中央气象台 2020 汛期业务检验——24h 累积 ECMWF 略强，但 ≥10mm 全时效 CMA-MESO 占优，25mm 阈值提升 50–100%；江淮梅雨暴雨以上 CMA-GFS-V4.2 优于 ECMWF-HRES。",
-  wind:"依据：2421 站评估——江淮/华南 JMA 最优，北方/西部 ECMWF 最优；但 ECMWF 风速系统性偏大 +1m/s，已做偏差订正；KMA 东亚同化近，中国北方/西部补充。",
-  gust:"依据：风场延伸推论——JMA 东亚季风区风场与阵风刻画好；KMA 韩国/中国北方近邻同化好；ICON/DWD 在欧洲阵风有验证但中国本土未见强证据，给中等权重。",
-  dir:"依据：随风场，量级与 wind 同序；ECMWF 在中国东部矢量稳定，JMA 江淮/华南最强。",
-  hum:"依据：2421 站评估——相对湿度 ECMWF 最优（明显高于 JMA 与 GFS）；AIFS 在中国本土缺证据，保守降权。",
-  pres:"依据：气压同化成熟，各模式在中国差异小，权重趋于平缓。",
-  cloud:"依据：云量为各模式共同难点，中国本土差异不显著，权重趋于平缓。",
-  vis:"依据：能见度由云/雾派生，中国雾霾多发模式需本地订正（彩云/和风有专门模型），国际模式本身差异小。",
-  uv:"依据：UV 是晴空 + 云量诊断量；JMA/KMA 东亚同化近；ECMWF 整体稳定。权重中等平缓。"
+  temp:"2421 个国家级自动站（2010–2013 实测，龚伟伟等《气候与环境研究》）显示：地面气温 ECMWF 最优，JMA 次之，GFS 在夏季偏差最大。",
+  precip:"中央气象台 2020 汛期业务检验：24 小时累计 ECMWF 略优，但 ≥10mm 全时效 CMA-MESO 占优，25mm 阈值提升 50–100%；江淮梅雨暴雨以上 CMA-GFS-V4.2 优于 ECMWF-HRES。",
+  wind:"2421 站评估：江淮、华南 JMA 最优，北方、西部 ECMWF 最优；ECMWF 风速系统性偏大约 1m/s，已做偏差订正；KMA 在东亚同化更接近，对中国北方、西部作补充。",
+  gust:"由风场评估延伸：JMA 在东亚季风区风场与阵风刻画更好；KMA 在韩国及中国北方同化更优；ICON/DWD 在欧洲阵风有验证，但中国本土证据不足，给中等权重。",
+  dir:"随风速评估，量级与风速同序；ECMWF 在中国东部矢量更稳定，JMA 在江淮、华南最强。",
+  hum:"2421 站评估：相对湿度 ECMWF 最优（明显优于 JMA 与 GFS）；AIFS 在中国本土缺证据，保守降权。",
+  pres:"气压同化技术成熟，各模式在中国差异很小，权重趋于平缓。",
+  cloud:"云量为各模式共同难点，中国本土差异不显著，权重趋于平缓。",
+  vis:"能见度由云、雾派生，中国雾霾多发区需本地化订正（彩云、和风有专门模型），国际模式本身差异较小。",
+  uv:"紫外线为晴空叠加云量诊断量；JMA、KMA 在东亚同化更近；ECMWF 整体稳定。权重中等且平缓。"
 };
 
 /* calibration effective weight */
@@ -1233,8 +1237,8 @@ function renderSources(){
   box.appendChild(confEl);
 
   $("#srcNote").innerHTML=
-    "综合预报 = 把每家预报源的结果按权重取平均。权重依据「中国本土公开评测」按项目分配（详见下方「逐变量权重」），并会随你在「校准」里记录的实测自动调整。"+
-    "<br><br>下方仅展示已实际接入的数据源。填了和风/心知/彩云的密钥后，对应源会出现在这里并参与综合；没填密钥的国内源（CMA、墨迹、MSN 等）没有可从浏览器直连的接口，我们就不显示了，免得摆个名字骗人。";
+    "综合预报 = 把每个预报源的结果按权重取平均。权重按「中国本土公开评测」分项目分配（详见下方「逐变量权重」），并会随校准中记录的实测自动调整。"+
+    "<br><br>下方仅展示已实际接入的数据源。填入和风天气、心知天气或彩云的密钥后，对应源会自动接入并参与综合；未填密钥的国内源（如 CMA、墨迹天气等）暂无可从浏览器直接调用的公开接口，因此暂不列出。";
   renderVarWeights();
 }
 function so(name,country,org,color,dt,wk){
@@ -1313,16 +1317,28 @@ async function reverse(lat,lng){
     $("#mapAddr").textContent=j.display_name||(lat.toFixed(4)+", "+lng.toFixed(4));
   }catch(e){$("#mapAddr").textContent=lat.toFixed(4)+", "+lng.toFixed(4);}
 }
+function haversine(la1,lo1,la2,lo2){
+  const R=6371,toR=d=>d*Math.PI/180;
+  const dLa=toR(la2-la1),dLo=toR(lo2-lo1);
+  const a=Math.sin(dLa/2)**2+Math.cos(toR(la1))*Math.cos(toR(la2))*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
 async function geoSearch(q){
   const res=$("#geoRes");res.innerHTML='<div style="color:var(--secondaryLabel)">搜索中…</div>';
   try{
-    const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=6&accept-language=zh-CN&q="+encodeURIComponent(q));
+    const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=8&accept-language=zh-CN&q="+encodeURIComponent(q));
     const j=await r.json();
     if(!j.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';return;}
+    const la0=APP.lat!=null?APP.lat:39.9042,lo0=APP.lng!=null?APP.lng:116.4074;
+    j.forEach(p=>{p._d=haversine(la0,lo0,+p.lat,+p.lon);});
+    j.sort((a,b)=>a._d-b._d);
     res.innerHTML="";
     j.forEach(p=>{
-      const d=document.createElement("div");
-      d.textContent=p.display_name;
+      const d=document.createElement("div");d.style.display="flex";d.style.alignItems="center";d.style.gap="6px";
+      const km=p._d>=1?p._d.toFixed(0)+" km":Math.round(p._d*1000)+" m";
+      const name=document.createElement("span");name.style.cssText="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";name.textContent=p.display_name;
+      const dist=document.createElement("span");dist.style.cssText="flex:0 0 auto;margin-left:8px;color:var(--systemIndigo);font-family:var(--font-num);font-weight:600;font-size:12px";dist.textContent=km;
+      d.appendChild(name);d.appendChild(dist);
       d.onclick=()=>{setLoc(+p.lat,+p.lon,p.display_name.split(",")[0],p.display_name);switchView("v-weather");};
       res.appendChild(d);
     });
@@ -1362,12 +1378,13 @@ function saveCurrent(){
 }
 function renderSaved(){
   const box=$("#savedList");box.innerHTML="";
-  if(!ST.saved.length){box.innerHTML='<div class="note">还没有保存的位置。可以先搜一下城市，定位后用右上角 ⚙ 进入设置，或直接点下方按钮保存当前点。</div>';return;}
-  /* 顶部加保存当前按钮 */
-  const add=document.createElement("div");add.className="sv";
-  add.innerHTML='<div class="sn">📍 保存当前位置</div><div class="sd">给当前点起个名字，方便切换</div>';
+  /* 顶部始终显示「保存当前位置」主按钮 */
+  const add=document.createElement("div");add.className="sv save-cta";
+  add.innerHTML='<div style="flex:1"><div class="sn">📍 保存当前位置</div><div class="sd">给当前点起个名字，方便一键切换</div></div>'+
+    '<div class="x" style="color:var(--systemIndigo);font-weight:700">保存</div>';
   add.onclick=saveCurrent;
   box.appendChild(add);
+  if(!ST.saved.length)return;
   ST.saved.forEach((s,idx)=>{
     const el=document.createElement("div");el.className="sv";
     el.innerHTML='<div style="flex:1"><div class="sn">'+s.name+'</div><div class="sd">'+s.sub+'</div></div>'+

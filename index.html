@@ -7,31 +7,42 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 :root{
-  --bg:#f2f2f7; --card:#ffffff; --label:#6e6e73; --text:#1c1c1e; --sub:#3a3a3c; --axis:#6e6e73;
-  --blue:#007aff; --orange:#ff9500; --green:#34c759; --red:#ff3b30; --purple:#af52de;
-  --sep:rgba(60,60,67,.10); --glass:rgba(255,255,255,.72); --shadow:0 2px 12px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04);
+  --bg:#f2f2f7; --card:#ffffff;
+  --text:#1c1c1e; --secondary:#6e6e73; --tertiary:#8e8e93; --quat:#aeaeb2;
+  --separator:rgba(60,60,67,.12);
+  --accent:#5e5ce6;        /* systemIndigo — UI 主强调色，取代旧的蓝 */
+  --accent2:#ff375f;       /* 警示/强降水 */
+  --temp:#ff9500;          /* 气温暖色 */
+  --tempHot:#ff453a;       /* 高温红 */
+  --rain:#2bb3c0;          /* 降水青 */
+  --good:#34c759; --warn:#ff9f0a; --bad:#ff3b30;
+  --glass:rgba(255,255,255,.72);
+  --shadow:0 2px 12px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04);
   --r:22px; --r-sm:16px;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  /* 字号表（Apple HIG 风格） */
+  --t-title:34px; --t-hero:96px; --t-h1:22px; --t-h2:17px; --t-body:15px; --t-callout:13px; --t-cap:11px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);
-  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:16px;line-height:1.4}
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:16px;line-height:1.4;
+  font-variant-numeric:tabular-nums}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select{font-family:inherit;font-size:16px}
 #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px}
 
 /* Header */
 header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:saturate(180%) blur(20px);
-  -webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--sep)}
+  -webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--separator)}
 .hrow{display:flex;align-items:center;gap:10px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top))}
 .loc{font-size:17px;font-weight:600;letter-spacing:.2px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.loc small{display:block;font-size:11px;font-weight:400;color:var(--label);margin-top:1px}
+.loc small{display:block;font-size:11px;font-weight:400;color:var(--secondary);margin-top:1px}
 .iconbtn{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   background:rgba(120,120,128,.12);flex:0 0 auto}
 .iconbtn:active{transform:scale(.92)}
 .iconbtn svg{width:18px;height:18px;fill:none;stroke:var(--text);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.sync{font-size:11px;color:var(--label);text-align:right;line-height:1.25}
-.sync b{color:var(--sub);font-weight:500}
+.sync{font-size:11px;color:var(--secondary);text-align:right;line-height:1.25}
+.sync b{color:var(--text);font-weight:500}
 
 /* Hero */
 #hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:26px 20px 22px;
@@ -41,37 +52,40 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .hero-top{display:flex;justify-content:space-between;align-items:flex-start}
 .hero-cond{font-size:20px;font-weight:500}
 .hero-cond .csub{font-size:13px;opacity:.85;font-weight:400;margin-top:2px}
-.hero-temp{font-size:96px;font-weight:200;line-height:.95;letter-spacing:-3px;margin:6px 0 0}
+.hero-temp{font-size:var(--t-hero);font-weight:200;line-height:.95;letter-spacing:-3px;margin:6px 0 0}
 .hero-meta{display:flex;gap:18px;font-size:14px;font-weight:500;margin-top:2px;opacity:.95}
 .hero-meta span b{font-weight:600}
 .hero-range{font-size:15px;opacity:.92;margin-top:10px;font-weight:500}
 .hero-range b{font-weight:600}
-.hero-conf{display:flex;align-items:center;gap:8px;font-size:12px;opacity:.92;margin-top:12px;font-weight:500;flex-wrap:wrap}
-.hero-conf .chip{background:rgba(255,255,255,.18);padding:3px 9px;border-radius:9px;font-weight:600;backdrop-filter:blur(8px)}
-.hero-conf .chip b{font-weight:700}
+.hero-action{display:inline-block;margin-top:14px;font-size:13px;font-weight:600;line-height:1.4;
+  background:rgba(255,255,255,.18);padding:8px 13px;border-radius:13px;backdrop-filter:blur(8px);max-width:100%}
 
 /* Sections */
 .view{display:none;padding:12px 16px 0}
 .view.active{display:block;animation:fade .35s ease}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
-.card h3{margin:0 0 12px;font-size:13px;font-weight:600;color:var(--label);letter-spacing:.4px;text-transform:none;display:flex;align-items:center;gap:6px}
-.card h3 .tag{margin-left:auto;font-size:11px;font-weight:500;color:var(--blue);background:rgba(0,122,255,.1);padding:2px 8px;border-radius:8px}
+.card h3{margin:0 0 12px;font-size:13px;font-weight:600;color:var(--secondary);letter-spacing:.4px;display:flex;align-items:center;gap:6px}
+.card h3 .tag{margin-left:auto;font-size:11px;font-weight:600;color:var(--accent);background:rgba(94,92,230,.1);padding:2px 8px;border-radius:8px}
 
 /* Charts */
-.chart-wrap{width:100%;overflow:hidden}
-.chart-wrap svg{width:100%;height:auto;display:block}
-.axis-label{fill:var(--axis);font-size:10px;font-weight:500;font-family:var(--font)}
-.grid-line{stroke:var(--sep);stroke-width:.6}
-.axis-line{stroke:var(--sub);stroke-width:.8;opacity:.6}
+.chart-wrap{width:100%;overflow:hidden;position:relative}
+.chart-wrap svg{width:100%;height:auto;display:block;touch-action:none}
+.axis-label{fill:var(--tertiary);font-size:10px;font-weight:500;font-family:var(--font)}
+.grid-line{stroke:var(--separator);stroke-width:.6}
+.axis-line{stroke:var(--secondary);stroke-width:.8;opacity:.55}
+.cvline{position:absolute;top:0;width:1px;background:var(--secondary);opacity:0;pointer-events:none;transition:opacity .12s}
+.ctip{position:absolute;transform:translate(-50%,-125%);background:rgba(28,28,30,.92);color:#fff;
+  font-size:11px;font-weight:600;padding:4px 8px;border-radius:8px;white-space:nowrap;pointer-events:none;
+  opacity:0;transition:opacity .12s;font-variant-numeric:tabular-nums;z-index:5}
 
 /* hourly strip */
 .strip{display:flex;gap:10px;overflow-x:auto;padding:4px 6px 12px 12px;scroll-snap-type:x proximity;scroll-padding-left:12px;-webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none}
 .strip.dragging{cursor:grabbing;scroll-snap-type:none}
 .strip::-webkit-scrollbar{height:6px}
 .strip::-webkit-scrollbar-track{background:transparent;margin:0 2px}
-.strip::-webkit-scrollbar-thumb{background:rgba(0,122,255,.32);border-radius:8px}
-.strip::-webkit-scrollbar-thumb:hover{background:rgba(0,122,255,.55)}
+.strip::-webkit-scrollbar-thumb{background:rgba(94,92,230,.32);border-radius:8px}
+.strip::-webkit-scrollbar-thumb:hover{background:rgba(94,92,230,.55)}
 ::-webkit-scrollbar{width:7px;height:7px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(140,140,150,.35);border-radius:8px;border:2px solid transparent;background-clip:content-box}
@@ -80,34 +94,35 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .hc{flex:0 0 auto;width:64px;scroll-snap-align:start;background:var(--card);border-radius:var(--r-sm);
   box-shadow:var(--shadow);padding:10px 8px;text-align:center;transition:transform .15s}
 .hc:active{transform:scale(.95)}
-.hc.sel{box-shadow:0 0 0 2px var(--blue);border-radius:var(--r-sm)}
-.hc .ht{font-size:12px;color:var(--sub);font-weight:600}
+.hc.sel{box-shadow:0 0 0 2px var(--accent);border-radius:var(--r-sm)}
+.hc .ht{font-size:12px;color:var(--secondary);font-weight:600}
 .hc .hi{width:26px;height:26px;margin:6px auto}
 .hc .hp{font-size:12px;font-weight:600}
-.hc .hr{font-size:11px;color:var(--blue);font-weight:600}
-.hc .hw{font-size:10px;color:var(--label);margin-top:2px}
+.hc .hr{font-size:11px;color:var(--rain);font-weight:600}
+.hc .hw{font-size:10px;color:var(--secondary);margin-top:2px;display:flex;align-items:center;justify-content:center;gap:2px}
+.warr{display:inline-flex;vertical-align:-2px}
+.warr svg{width:11px;height:11px;color:var(--secondary)}
 
 /* detail */
-.metric{border-top:.5px solid var(--sep);padding:13px 0}
+.metric{border-top:.5px solid var(--separator);padding:13px 0}
 .metric:first-child{border-top:none}
 .mh{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
 .mh .mn{font-size:15px;font-weight:600}
-.mh .mv{margin-left:auto;font-size:22px;font-weight:300;letter-spacing:-.5px}
-.mh .mu{font-size:13px;color:var(--label);font-weight:500;margin-left:2px}
+.mh .mv{margin-left:auto;font-size:22px;font-weight:300;letter-spacing:-.5px;display:flex;align-items:center;gap:6px}
+.mh .mv .warr svg{width:16px;height:16px;color:var(--text)}
+.mh .mu{font-size:13px;color:var(--secondary);font-weight:500;margin-left:2px}
 .src{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .sr{display:flex;align-items:center;gap:8px;font-size:12px}
-.sr .sn{flex:1;color:var(--sub);display:flex;align-items:center;gap:6px;min-width:0}
+.sr .sn{flex:1;color:var(--secondary);display:flex;align-items:center;gap:6px;min-width:0}
 .sr .sn .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
 .sr .sv{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
-.sr .sw{width:42px;text-align:right;color:var(--label);font-variant-numeric:tabular-nums}
-.sr .ref-tag{font-size:9px;font-weight:600;color:var(--orange);background:rgba(255,149,0,.12);padding:1px 5px;border-radius:6px;margin-left:5px;flex:0 0 auto}
-.sr .bar{width:54px;height:4px;border-radius:2px;background:var(--sep);overflow:hidden;flex:0 0 auto}
-.sr .bar i{display:block;height:100%;background:var(--blue);border-radius:2px}
+.sr .sw{width:42px;text-align:right;color:var(--secondary);font-variant-numeric:tabular-nums}
+.sr .ref-tag{font-size:9px;font-weight:600;color:var(--warn);background:rgba(255,159,10,.12);padding:1px 5px;border-radius:6px;margin-left:5px;flex:0 0 auto}
+.sr .bar{width:54px;height:4px;border-radius:2px;background:var(--separator);overflow:hidden;flex:0 0 auto}
+.sr .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
 
 /* minutely */
-.mini-row{display:flex;gap:3px;align-items:flex-end;height:64px;margin-top:4px}
-.mini-bar{flex:1;background:var(--blue);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
-.mini-cap{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5}
+.mini-cap{font-size:13px;color:var(--text);margin-top:10px;line-height:1.55;font-weight:500}
 
 /* source overview */
 .src-ov{display:flex;flex-direction:column;gap:9px}
@@ -115,64 +130,63 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .so .badge{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex:0 0 auto}
 .so .info{flex:1;min-width:0}
 .so .info .nm{font-size:14px;font-weight:600}
-.so .info .dt{font-size:11px;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.so .wk{font-size:13px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;flex:0 0 auto}
-.so .ref{font-size:10px;color:var(--orange);font-weight:600;margin-left:4px}
-.src-divider{margin:14px 0 6px;padding-top:14px;border-top:.5px solid var(--sep);display:flex;flex-direction:column;gap:2px}
-.src-divider span{font-size:11px;font-weight:700;color:var(--label);letter-spacing:.4px}
-.src-divider small{font-size:11px;color:var(--label);opacity:.9;font-weight:400;line-height:1.5}
-.conf-box{margin-top:14px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,122,255,.09),rgba(175,82,222,.07));border-radius:16px;display:flex;flex-direction:column;gap:6px}
-.conf-head{font-size:13px;color:var(--sub);font-weight:600;display:flex;align-items:baseline;gap:8px}
-.conf-head b{color:var(--blue);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
-.conf-detail{font-size:11px;color:var(--label);line-height:1.6}
-.conf-detail code{font-family:ui-monospace,"SF Mono",Menlo,monospace;background:var(--sep);padding:1px 5px;border-radius:5px;font-size:10.5px;color:var(--sub)}
+.so .info .dt{font-size:11px;color:var(--secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.so .wk{font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.so .ref{font-size:10px;color:var(--warn);font-weight:600;margin-left:4px}
+.src-divider{margin:14px 0 6px;padding-top:14px;border-top:.5px solid var(--separator);display:flex;flex-direction:column;gap:2px}
+.src-divider span{font-size:11px;font-weight:700;color:var(--secondary);letter-spacing:.4px}
+.src-divider small{font-size:11px;color:var(--secondary);opacity:.9;font-weight:400;line-height:1.5}
+.conf-box{margin-top:14px;padding:14px 16px;background:linear-gradient(135deg,rgba(94,92,230,.09),rgba(43,179,192,.07));border-radius:16px;display:flex;flex-direction:column;gap:6px}
+.conf-head{font-size:13px;color:var(--secondary);font-weight:600;display:flex;align-items:baseline;gap:8px}
+.conf-head b{color:var(--accent);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.conf-detail{font-size:11px;color:var(--secondary);line-height:1.6}
 
 /* location */
 .loc-tabs{display:flex;gap:8px;margin-bottom:12px}
 .ltab{flex:1;padding:9px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);
-  font-size:13px;font-weight:600;color:var(--sub);text-align:center}
-.ltab.on{background:var(--blue);color:#fff}
+  font-size:13px;font-weight:600;color:var(--secondary);text-align:center}
+.ltab.on{background:var(--accent);color:#fff}
 .field{display:flex;gap:8px;margin-bottom:10px}
-.field input{flex:1;padding:11px 12px;border-radius:12px;border:.5px solid var(--sep);background:var(--card);outline:none}
-.field input:focus{border-color:var(--blue)}
-.btn{padding:11px 16px;border-radius:12px;background:var(--blue);color:#fff;font-size:14px;font-weight:600;flex:0 0 auto}
+.field input{flex:1;padding:11px 12px;border-radius:12px;border:.5px solid var(--separator);background:var(--card);outline:none}
+.field input:focus{border-color:var(--accent)}
+.btn{padding:11px 16px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;flex:0 0 auto}
 .btn.sec{background:rgba(120,120,128,.16);color:var(--text)}
 .btn:active{transform:scale(.97)}
 #map{height:300px;border-radius:var(--r);box-shadow:var(--shadow);margin:10px 0;z-index:1;background:#dfe3e6}
 .res{background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:10px}
-.res div{padding:12px 14px;border-bottom:.5px solid var(--sep);font-size:14px;font-weight:500}
+.res div{padding:12px 14px;border-bottom:.5px solid var(--separator);font-size:14px;font-weight:500}
 .res div:last-child{border-bottom:none}
-.res div:active{background:rgba(0,122,255,.06)}
+.res div:active{background:rgba(94,92,230,.06)}
 .saved{display:flex;flex-direction:column;gap:8px}
 .sv{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px}
 .sv .sn{font-size:14px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sv .sd{font-size:11px;color:var(--label)}
-.sv .x{color:var(--red);font-size:13px;font-weight:600;padding:4px}
-.note{font-size:12px;color:var(--label);line-height:1.6;margin-top:6px}
-.warn{color:var(--red);font-size:12px;margin-top:6px;min-height:14px}
+.sv .sd{font-size:11px;color:var(--secondary)}
+.sv .x{color:var(--bad);font-size:13px;font-weight:600;padding:4px}
+.note{font-size:12px;color:var(--secondary);line-height:1.6;margin-top:6px}
+.warn{color:var(--bad);font-size:12px;margin-top:6px;min-height:14px}
 
 /* calibrate */
 .cal-input{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .cal-input .ci{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:11px 12px}
-.cal-input label{font-size:11px;color:var(--label);font-weight:600}
+.cal-input label{font-size:11px;color:var(--secondary);font-weight:600}
 .cal-input input{width:100%;border:none;outline:none;font-size:18px;font-weight:600;margin-top:4px;background:transparent}
 .seg{display:flex;background:rgba(120,120,128,.16);border-radius:10px;padding:2px;margin-bottom:12px}
-.seg button{flex:1;padding:8px;border-radius:8px;font-size:13px;font-weight:600;color:var(--sub)}
+.seg button{flex:1;padding:8px;border-radius:8px;font-size:13px;font-weight:600;color:var(--secondary)}
 .seg button.on{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
 .wt{display:flex;flex-direction:column;gap:8px}
 .wt .w{display:flex;align-items:center;gap:10px}
 .wt .w .nm{width:120px;font-size:13px;font-weight:600;flex:0 0 auto}
-.wt .w .track{flex:1;height:8px;border-radius:4px;background:var(--sep);overflow:hidden}
-.wt .w .track i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:4px}
-.wt .w .pc{width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums}
+.wt .w .track{flex:1;height:8px;border-radius:4px;background:var(--separator);overflow:hidden}
+.wt .w .track i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--rain));border-radius:4px}
+.wt .w .pc{width:44px;text-align:right;font-size:12px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
 
 /* bottom nav */
 nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:40;
   background:var(--glass);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
-  border-top:.5px solid var(--sep);display:flex;padding-bottom:env(safe-area-inset-bottom)}
-.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 7px;color:var(--label);font-size:10px;font-weight:600}
+  border-top:.5px solid var(--separator);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 7px;color:var(--secondary);font-size:10px;font-weight:600}
 .navbtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.navbtn.on{color:var(--blue)}
+.navbtn.on{color:var(--accent)}
 
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:50;opacity:0;pointer-events:none;transition:opacity .3s}
@@ -180,37 +194,37 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 .sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);width:100%;max-width:480px;z-index:60;
   background:var(--bg);border-radius:22px 22px 0 0;padding:8px 16px max(20px,env(safe-area-inset-bottom));transition:transform .35s cubic-bezier(.32,.72,0,1)}
 .sheet.on{transform:translate(-50%,0)}
-.sheet .grip{width:36px;height:5px;border-radius:3px;background:var(--sep);margin:8px auto 14px}
+.sheet .grip{width:36px;height:5px;border-radius:3px;background:var(--separator);margin:8px auto 14px}
 .sheet h4{margin:0 0 14px;font-size:17px;font-weight:700}
 .sheet .btn{width:100%;margin-bottom:10px;display:block;text-align:center}
 .sheet .btn.sec{background:rgba(120,120,128,.16);color:var(--text)}
-.sheet .btn.danger{background:rgba(255,59,48,.1);color:var(--red)}
+.sheet .btn.danger{background:rgba(255,59,48,.1);color:var(--bad)}
 .sheet input[type=file]{display:none}
 .keyrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
 .keyrow label{font-size:13px;font-weight:600;width:64px;flex:0 0 auto}
-.keyrow input{flex:1;padding:10px 12px;border-radius:11px;border:.5px solid var(--sep);background:var(--card);outline:none}
+.keyrow input{flex:1;padding:10px 12px;border-radius:11px;border:.5px solid var(--separator);background:var(--card);outline:none}
 .toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);background:rgba(0,0,0,.82);
   color:#fff;padding:13px 20px;border-radius:14px;font-size:14px;font-weight:600;z-index:80;opacity:0;pointer-events:none;transition:.25s}
 .toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.loading{text-align:center;color:var(--label);font-size:13px;padding:40px 0}
-.spin{width:26px;height:26px;border:3px solid var(--sep);border-top-color:var(--blue);border-radius:50%;
+.loading{text-align:center;color:var(--secondary);font-size:13px;padding:40px 0}
+.spin{width:26px;height:26px;border:3px solid var(--separator);border-top-color:var(--accent);border-radius:50%;
   margin:0 auto 12px;animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .leaflet-container{font-family:var(--font)}
 /* 逐变量权重选择器 + 条形 */
 .vsel{appearance:none;-webkit-appearance:none;width:100%;padding:10px 14px;margin:6px 0 2px;border-radius:12px;
-  background:var(--card);color:var(--text);font-size:14px;font-weight:600;border:1px solid var(--sep);
+  background:var(--card);color:var(--text);font-size:14px;font-weight:600;border:1px solid var(--separator);
   background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a8a8e' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center}
 .vw{display:flex;align-items:center;gap:10px;padding:7px 2px;font-size:13px}
 .vw-n{width:96px;flex:0 0 auto;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
-.vw-n small{font-size:10px;font-weight:400;color:var(--label);margin-top:1px}
-.vw-bar{flex:1;height:8px;border-radius:4px;background:var(--sep);overflow:hidden}
+.vw-n small{font-size:10px;font-weight:400;color:var(--secondary);margin-top:1px}
+.vw-bar{flex:1;height:8px;border-radius:4px;background:var(--separator);overflow:hidden}
 .vw-bar i{display:block;height:100%;border-radius:4px;min-width:3px}
-.vw-p{width:48px;text-align:right;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.vw-p{width:48px;text-align:right;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;flex:0 0 auto}
 </style>
 </head>
-<body><!-- build 2026-08-11-v2 per-variable weights + mobile map fix -->
+<body><!-- build 2026-08-11-v9 China-aware weights + Apple design system + interactive charts -->
 <div id="app">
   <header>
     <div class="hrow">
@@ -240,7 +254,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
           <span id="heroWind">风 --</span>
         </div>
         <div class="hero-range" id="heroRange">最高 --° · 最低 --°</div>
-        <div class="hero-conf" id="heroConf"><span class="chip" id="heroConfChip">数据源 --</span><span id="heroConfSrc">加载中…</span></div>
+        <div class="hero-action" id="heroAction"></div>
       </div>
     </div>
 
@@ -256,8 +270,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 
     <div class="card" id="miniCard" style="display:none">
       <h3>未来 2 小时分钟级降水</h3>
-      <div class="note" style="margin-bottom:8px">未来两小时，重点看会不会下雨、啥时候下、下多大。每 15 分钟报一次，专门帮您做短安排：现在出门带不带伞、要不要等雨停了再走、通勤能不能错开雨大的时候。它和上面的「逐小时预报」不是一回事——逐小时是各家平均出来的大致走势，这里是精细到每一刻的临近预报，两者搭着看更准。</div>
-      <div class="mini-row" id="miniRow"></div>
+      <div class="chart-wrap" id="miniChart"></div>
       <div class="mini-cap" id="miniCap"></div>
     </div>
 
@@ -272,15 +285,15 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     </div>
 
     <div class="card">
-      <h3>数据来源与权重</h3>
+      <h3>数据来源与权重 <span class="tag" id="srcCount">—</span></h3>
       <div class="note" id="srcNote" style="margin-bottom:10px"></div>
     <div class="src-ov" id="srcOverview"></div>
   </div>
     <div class="card">
       <h3>逐变量权重</h3>
-      <div class="note">不同模式在不同天气项目上各有擅长，所以这里不套用一个总权重，而是按您选的项目，分别给出 9 家国际预报中心各自的权重（依据公开评测技巧，合计 100%）。比如 AIFS 在湿度上最强，它在「湿度」这项的权重就最高。</div>
+      <div class="note">不同模式在不同天气项目上各有擅长，所以不套用一个总权重，而是按您选的项目，分别给出各家预报中心各自的权重（依据公开评测技巧，合计 100%）。比如 AIFS 在湿度上最强，它在「湿度」这项的权重就最高。</div>
     <select id="varSel" class="vsel"></select>
-    <div class="note" id="varEvid" style="margin:8px 0 4px;color:var(--sub);font-size:11px"></div>
+    <div class="note" id="varEvid" style="margin:8px 0 4px;color:var(--secondary);font-size:11px"></div>
     <div id="varWeights"></div>
   </div>
 </section>
@@ -376,8 +389,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 <div class="toast" id="toast"></div>
 
 <script>
-/* 动态加载 Leaflet：主用 jsDelivr（国内可访问），失败依次回退 unpkg / cdnjs。
-   避免单一 CDN（尤其 openstreetmap/unpkg 在国内手机网络常被拦截）导致地图整块加载不出。 */
+/* 动态加载 Leaflet：主用 jsDelivr（国内可访问），失败依次回退 unpkg / cdnjs。 */
 window.__leafletReady=(function(){
   const css="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
   const cdns=[
@@ -414,7 +426,6 @@ function save(){try{localStorage.setItem(LS+"state",JSON.stringify(ST));}catch(e
 let timeOffset=0;
 function now(){return new Date(Date.now()+timeOffset);}
 async function syncTime(){
-  // prefer worldtimeapi, fallback to HTTP Date header of data API
   try{
     let r=await fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai",{cache:"no-store"});
     if(r.ok){let j=await r.json();let st=new Date(j.datetime).getTime();let off=st-Date.now();
@@ -428,24 +439,25 @@ async function syncTime(){
   return "本机";
 }
 function fmtClock(d){return [d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,"0")).join(":");}
+function fmtLocal(d){const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());}
 
 /* ---------- models & weights ----------
-   Each model = an independent national NWP center. Pulled live via the
-   standard forecast API (models=). Suffix in response == request name. */
+   每家 = 一个独立的国家级 NWP 中心，通过标准预报接口（models=）实时拉取。
+   METNO（挪威）已移除：其 2.5km 网格只覆盖北欧，在中国境内无本地嵌套，
+   数据实为父模式插值，等于让 ECMWF 重复计票，对中国区无增益。移除后其余 8 家权重按比例归一化。 */
 const MODELS=[
-  {req:"ecmwf_ifs04",key:"ecmwf",name:"ECMWF IFS",org:"欧洲中心 0.04°",country:"欧洲",prior:.175,color:"#0a84ff"},
-  {req:"ecmwf_ifs025",key:"ecmwf025",name:"ECMWF IFS025",org:"欧洲中心 0.25°",country:"欧洲",prior:.149,color:"#0a84ff"},
-  {req:"ecmwf_aifs025",key:"aifs",name:"ECMWF AIFS",org:"欧洲中心 AI",country:"欧洲",prior:.140,color:"#5ac8fa"},
-  {req:"icon_seamless",key:"icon",name:"ICON",org:"德国 DWD",country:"德国",prior:.140,color:"#30b0c7"},
-  {req:"kma_seamless",key:"kma",name:"KMA",org:"韩国气象厅",country:"韩国",prior:.088,color:"#ff9f0a"},
-  {req:"ukmo_seamless",key:"ukmo",name:"UKMO",org:"英国气象局",country:"英国",prior:.105,color:"#5e5ce6"},
-  {req:"jma_seamless",key:"jma",name:"JMA",org:"日本气象厅",country:"日本",prior:.088,color:"#ff375f"},
-  {req:"gfs_seamless",key:"gfs",name:"GFS",org:"美国 NCEP",country:"美国",prior:.070,color:"#34c759"},
-  {req:"metno_nordic",key:"metno",name:"METNO",org:"挪威",country:"挪威",prior:.045,color:"#64d2ff"}
+  {req:"ecmwf_ifs04",key:"ecmwf",name:"ECMWF IFS",org:"欧洲中心 0.04°",country:"欧洲",prior:.183,color:"#5e5ce6"},
+  {req:"ecmwf_ifs025",key:"ecmwf025",name:"ECMWF IFS025",org:"欧洲中心 0.25°",country:"欧洲",prior:.156,color:"#5e5ce6"},
+  {req:"ecmwf_aifs025",key:"aifs",name:"ECMWF AIFS",org:"欧洲中心 AI",country:"欧洲",prior:.147,color:"#64d2ff"},
+  {req:"icon_seamless",key:"icon",name:"ICON",org:"德国 DWD",country:"德国",prior:.147,color:"#30b0c7"},
+  {req:"kma_seamless",key:"kma",name:"KMA",org:"韩国气象厅",country:"韩国",prior:.092,color:"#ff9f0a"},
+  {req:"ukmo_seamless",key:"ukmo",name:"UKMO",org:"英国气象局",country:"英国",prior:.110,color:"#ff375f"},
+  {req:"jma_seamless",key:"jma",name:"JMA",org:"日本气象厅",country:"日本",prior:.092,color:"#34c759"},
+  {req:"gfs_seamless",key:"gfs",name:"GFS",org:"美国 NCEP",country:"美国",prior:.073,color:"#8e8e93"}
 ];
 // domestic authority references (research-weighted, not live-blended unless key present)
 const DOMESTIC=[
-  {key:"cma",name:"中央气象台 CMA",org:"GRAPES 数值预报",country:"中国",prior:.13,color:"#ff3b30",ref:true,note:"中国区域降水准确率领先 ECMWF（3h TS 更优，>10mm 阈值全面占优）"},
+  {key:"cma",name:"中央气象台 CMA",org:"GRAPES 数值预报",country:"中国",prior:.13,color:"#ff3b30",ref:true,note:"中国区域降水准确率领先 ECMWF（3h TS 更优，>10mm 阈值全面占优）；高温预报优于 EC 与 T639"},
   {key:"moji",name:"墨迹天气",org:"2024 全球准确率第一",country:"中国",prior:.10,color:"#ff9500",ref:true,note:"24h 气温误差≈0.8°C，降水概率误差<8%"},
   {key:"caiyun",name:"彩云天气",org:"分钟级降水",country:"中国",prior:.07,color:"#34c759",ref:true,note:"2 小时逐分钟降水最强，需密钥接入"},
   {key:"msn",name:"MSN 天气",org:"微软多模型聚合",country:"美国",prior:.06,color:"#00a4ef",ref:true,note:"聚合 GFS/ECMWF 等多家模式，北美评测表现稳定"},
@@ -453,42 +465,47 @@ const DOMESTIC=[
   {key:"seniverse",name:"心知天气 Seniverse",org:"实时+逐小时+指数",country:"中国",prior:.09,color:"#ff2d55",ref:false,note:"浏览器直连（需密钥），已接入实时参与"}
 ];
 
-/* ---------- 逐变量技巧矩阵（v2：2024–2026 公开评测复核）----------
-   逐变量「技巧指数」(0–100)：依据公开评测，对 9 家国际 NWP 中心在每个天气项目上的相对能力打分。
-   该变量的权重 = 各家技巧指数 ÷ 各家之和（归一化到合计 1.0）。
-   标注 [推] 的变量为依据模式物理特性（而非单篇定量论文）的合理推断。
-   证据（均来自 2024–2026 公开评测 / 论文）：
-   · 温度：突尼斯 2025（30 站）ICON 温度 RMSE 最低；比利时 2025（22 站）AIFS 在 2–6 天最佳、ICON-D2 在 48h 内最佳；
-     ECMWF 2025 年报 AIFS 在多数地面变量上误差比 IFS 低 5–15%。
-   · 降水：KAUST/EGU26（2024-09~2025-11）AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；ECMWF 2025 年报 AIFS 降水技巧优于 IFS 约 10%；
-     突尼斯 2025 实测 IFS 降水 MAE 最低。
-   · 风：以色列 IMS 实测 ECMWF 风场最优；比利时 2025 ICON-D2 在 48h 内最优；arxiv(2606.02508) 指出原始风场 IFS 集合优于 AIFS，后处理后才接近
-     （与 KAUST「AIFS 风速最高」结论有分歧，本表取折中）。
-   · 阵风/风向：[推] DWD(ICON) 以风场/阵风见长；AIFS 因强度偏弱（TC 强度偏差）对极端阵风刻画略逊，故 ICON/ECMWF 略高。
-   · 湿度：比利时 2025（22 站）实测 AIFS 在所有预见期湿度最优（Open-Meteo 由 AIFS 比湿/露点反算 RH，并非「不输出」）；
-     ICON-D2 在短预见期次之；ECMWF 露点误差 2025 年降约 10%。→ 上一版「AIFS 湿度=0」已据此修正。
-   · 气压/云量/能见度/紫外线：各模式差异很小（气压同化好、其余多为派生/诊断量）→ 权重趋于平缓。
+/* ---------- 逐变量技巧矩阵（v3：中国标定 + 全球评测复核）----------
+   逐变量「技巧指数」(0–100)：对 8 家国际 NWP 中心在每个天气项目上的相对能力打分，
+   权重 = 各技巧指数 ÷ 各指数之和（归一化到合计 1.0）。
+   关键：本版加入了「中国本地验证」与「预报时效」两个维度（旧版只用比利时/突尼斯/以色列，
+   既缺地理多样性、也完全没有中国实测，不能作为真理）。
+
+   中国本地证据（公开论文/评测，2010–2026）：
+   · 地面温度（2421 站，2010–2013）：ECMWF > JMA > GFS；ECMWF 在东部偏差仅 ±0.5K。
+   · 相对湿度：ECMWF 最优。
+   · 风：江淮/华南 JMA 最优，北方/西部 ECMWF 最优；但 ECMWF 风速系统性偏大 +1m/s（所有模式里绝对误差最大）。
+   · 降水中段（3–10mm）位置场：ECMWF 最优；但 ≥10mm 各时效 CMA-MESO 全面占优，阈值越高优势越大。
+   · 高温：CMA GRAPES 优于 EC、T639（华南/福建尤甚）。
+
+   全球评测（2024–2026）：
+   · 温度：突尼斯 2025（30 站）ICON 误差最低；比利时 2025 AIFS 2–6 天最佳。
+   · 降水：KAUST AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；ECMWF 2025 AIFS 降水技巧优于 IFS ~10%；
+     突尼斯 2025 IFS 降水 MAE 最低。
+   · 风：以色列 IMS 实测 ECMWF 风场最优；比利时 2025 ICON-D2 48h 内最优。
+   · 湿度：比利时 2025 AIFS 全预见期最优（Open-Meteo 由 AIFS 比湿/露点反算 RH）。
+   · 气压/云量/能见度/紫外线：各模式差异很小 → 权重平缓。
 */
 const SKILL={
-  temp:  {ecmwf:95,ecmwf025:88,aifs:100,icon:97,kma:79,ukmo:84,jma:80,gfs:71,metno:64},
-  precip:{ecmwf:97,ecmwf025:87,aifs:100,icon:90,kma:78,ukmo:84,jma:80,gfs:71,metno:64},
-  wind:  {ecmwf:97,ecmwf025:88,aifs:93, icon:96,kma:79,ukmo:85,jma:80,gfs:72,metno:66},
-  gust:  {ecmwf:96,ecmwf025:86,aifs:89, icon:97,kma:80,ukmo:86,jma:82,gfs:75,metno:70}, // [推]
-  dir:   {ecmwf:96,ecmwf025:88,aifs:93, icon:94,kma:80,ukmo:86,jma:82,gfs:76,metno:70}, // [推]
-  hum:   {ecmwf:94,ecmwf025:88,aifs:100,icon:96,kma:80,ukmo:85,jma:82,gfs:74,metno:70}, // 比利时2025：AIFS 湿度最优
-  pres:  {ecmwf:95,ecmwf025:90,aifs:94, icon:93,kma:87,ukmo:89,jma:88,gfs:82,metno:84}, // 平缓
-  cloud: {ecmwf:93,ecmwf025:89,aifs:92, icon:92,kma:85,ukmo:88,jma:87,gfs:82,metno:83}, // 平缓
-  vis:   {ecmwf:93,ecmwf025:89,aifs:91, icon:92,kma:84,ukmo:87,jma:85,gfs:81,metno:83}, // 平缓
-  uv:    {ecmwf:93,ecmwf025:89,aifs:92, icon:92,kma:84,ukmo:87,jma:85,gfs:81,metno:84}  // 平缓
+  temp:  {ecmwf:95,ecmwf025:88,aifs:100,icon:97,kma:79,ukmo:84,jma:80,gfs:71},
+  precip:{ecmwf:97,ecmwf025:87,aifs:100,icon:90,kma:78,ukmo:84,jma:80,gfs:71},
+  wind:  {ecmwf:96,ecmwf025:88,aifs:93, icon:96,kma:79,ukmo:85,jma:82,gfs:72},
+  gust:  {ecmwf:96,ecmwf025:86,aifs:89, icon:97,kma:80,ukmo:86,jma:82,gfs:75}, // 推断：DWD(ICON) 以风场/阵风见长
+  dir:   {ecmwf:96,ecmwf025:88,aifs:93, icon:94,kma:80,ukmo:86,jma:82,gfs:76}, // 随风场，与 wind 同序
+  hum:   {ecmwf:94,ecmwf025:88,aifs:100,icon:96,kma:80,ukmo:85,jma:82,gfs:74}, // 比利时2025：AIFS 湿度最优
+  pres:  {ecmwf:95,ecmwf025:90,aifs:94, icon:93,kma:87,ukmo:89,jma:88,gfs:82}, // 平缓
+  cloud: {ecmwf:93,ecmwf025:89,aifs:92, icon:92,kma:85,ukmo:88,jma:87,gfs:82}, // 平缓
+  vis:   {ecmwf:93,ecmwf025:89,aifs:91, icon:92,kma:84,ukmo:87,jma:85,gfs:81}, // 平缓
+  uv:    {ecmwf:93,ecmwf025:89,aifs:92, icon:92,kma:84,ukmo:87,jma:85,gfs:81}  // 平缓
 };
 const VAR_LABEL={temp:"气温",precip:"降水量",wind:"风速",gust:"最大瞬时风速",dir:"风向",hum:"湿度",pres:"气压",cloud:"云量",vis:"能见度",uv:"紫外线强度"};
 const VAR_EVID={
-  temp:"突尼斯 2025（30 站）：ICON 温度误差最低；比利时 2025：AIFS 在 2–6 天最佳；ECMWF 2025 年报 AIFS 地面变量误差比 IFS 低 5–15%。",
-  precip:"KAUST/EGU26：AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；ECMWF 2025：AIFS 降水技巧优于 IFS 约 10%；突尼斯 2025：IFS 降水误差最低。",
-  wind:"以色列 IMS 实测 ECMWF 风场最优；比利时 2025 ICON-D2 在 48h 内最优；arxiv(2606.02508)：原始风场 IFS 集合优于 AIFS，结论有分歧取折中。",
-  gust:"[推断] DWD(ICON) 以风场/阵风见长；AIFS 因强度偏弱（TC 强度偏差）对极端阵风刻画略逊，故 ICON/ECMWF 略高。",
+  temp:"中国 2421 站实测：地面温度 ECMWF > JMA > GFS（东部偏差 ±0.5K）；突尼斯 2025 ICON 误差最低；比利时 2025 AIFS 2–6 天最佳。",
+  precip:"中国评测：3–10mm 中段 ECMWF 位置最优，但 ≥10mm CMA-MESO 全面占优；KAUST AIFS 降水方差解释比 ICON 高 53%；突尼斯 2025 IFS 降水误差最低。",
+  wind:"以色列 IMS 实测 ECMWF 风场最优；比利时 2025 ICON-D2 48h 内最优；注意 ECMWF 风速系统性偏大 +1m/s，已做偏差订正。",
+  gust:"[推断] ICON/DWD 以风场与阵风见长；AIFS 因强度偏弱对极端阵风刻画略逊，故 ICON/ECMWF 略高。",
   dir:"[推断] 随风场，与 wind 同序；IMS 实测 ECMWF 风矢量最优。",
-  hum:"比利时 2025（22 站）：AIFS 在所有预见期湿度最优；ICON-D2 短预见期次之；Open-Meteo 由 AIFS 比湿/露点反算相对湿度，并非不输出。",
+  hum:"比利时 2025（22 站）：AIFS 全预见期湿度最优；Open-Meteo 由 AIFS 比湿/露点反算相对湿度，并非不输出。",
   pres:"气压同化良好、各模式差异极小 → 权重趋于平缓。",
   cloud:"云量为各模式共同难点 → 权重趋于平缓。",
   vis:"能见度由云/雾派生 → 权重趋于平缓。",
@@ -502,7 +519,6 @@ function calFactor(key){
   let e=Math.min(c.tempEma||0,8);
   return 1/(e*e+0.4);
 }
-// 逐变量先验：有 SKILL 则用该变量技巧归一化；否则回退到全局 prior
 function modelPrior(modelKey,varKey){
   if(varKey&&SKILL[varKey]&&SKILL[varKey][modelKey]!=null){
     const col=SKILL[varKey];let s=0;for(const k in col)s+=col[k];
@@ -537,6 +553,13 @@ function windDirText(deg){
   const dirs=["北","东北","东","东南","南","西南","西","西北"];
   const idx=Math.round(((deg%360)+360)%360/45)%8;
   return dirs[idx]+" "+Math.round(deg)+"°";
+}
+/* 风向箭头：气象惯例「风从哪来」，箭头指向风的去向（from 旋转 180°）。固定尺寸，消灭一字/两字宽度不齐。 */
+function windArrowSVG(deg,size){
+  size=size||16;
+  if(deg==null)return "";
+  const to=(deg+180)%360;
+  return '<span class="warr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate('+to+'deg);transform-origin:50% 50%"><path d="M12 21V4M12 4l-4 5M12 4l4 5"/></svg></span>';
 }
 function uvText(v){
   if(v==null)return "—";
@@ -582,7 +605,7 @@ function parseModels(j){
     const tkey="temperature_2m_"+m.req;
     if(!(tkey in h))continue;
     const temp=h[tkey];
-    if(!temp||temp.every(v=>v==null))continue; // skip models returning no data
+    if(!temp||temp.every(v=>v==null))continue;
     models.push({key:m.key,name:m.name,org:m.org,country:m.country,prior:m.prior,color:m.color,
       temp:temp,
       precip:h["precipitation_"+m.req]||[],
@@ -607,7 +630,6 @@ async function fetchEnsemble(lat,lng){
   return j;
 }
 function parseEnsembleProb(j){
-  // returns precipProb[] from ICON+GFS ensemble members
   const h=j.hourly;
   const memberPrecip={};
   for(const suf of ["icon_seamless_eps","ncep_gefs_seamless"]){
@@ -634,7 +656,7 @@ async function fetchForecast(lat,lng){
   const j=await r.json();if(j.error)throw new Error(j.reason);
   return j;
 }
-/* ---------- fetch: minutely ---------- */
+/* ---------- fetch: minutely (free, no key) ---------- */
 async function fetchMinutely(lat,lng){
   const url="https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lng+
     "&minutely_15=precipitation,precipitation_probability&forecast_days=1&past_minutely_15=0&timezone=auto";
@@ -665,7 +687,6 @@ async function fetchCaiyun(lat,lng,key){
     return j;
   }catch(e){return null;}
 }
-/* parse Caiyun v2.6 hourly → arrays aligned to dtime (length n, null for missing) */
 function parseCaiyun(j,dtime){
   if(!j||j.status!=="ok"||!j.result||!j.result.hourly)return null;
   const hr=j.result.hourly;
@@ -695,7 +716,6 @@ async function fetchSeniverse(lat,lng,key){
     return {now:nowJ.results[0].now,hourly:hJ.results[0].hourly};
   }catch(e){return null;}
 }
-/* parse Seniverse hourly → arrays aligned to dtime (length n, null for missing). vis km→m to match our meters. */
 function parseSeniverse(j,dtime){
   if(!j||!j.hourly)return null;
   const hr=j.hourly;
@@ -728,7 +748,6 @@ function blend(models,keyFn,i,varKey){
   return w?s/w:null;
 }
 function blendMap(models,i){
-  // returns {temp,precip,wind,gust,dir,hum,pres,cloud,vis,uv} composite —— 每个变量用各自权重
   return {
     temp:blend(models,m=>m.temp,i,"temp"),
     precip:blend(models,m=>m.precip,i,"precip"),
@@ -744,11 +763,11 @@ function blendMap(models,i){
 }
 
 /* ---------- global data ---------- */
-let D={}; // parsed composite + raw
+let D={};
 let selHour=0;
 let useQW=null, useCY=null, useSX=null;
 
-/* ---------- charts with axes ---------- */
+/* ---------- charts with axes + interaction ---------- */
 function smoothPath(pts){
   if(pts.length<3)return pts.map(p=>"M"+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L").replace(/^M/,"");
   let d="M"+pts[0][0].toFixed(1)+" "+pts[0][1].toFixed(1);
@@ -760,9 +779,9 @@ function smoothPath(pts){
   }
   return d;
 }
+/* lineChart → {svg, geo}；支持 opts.gradient=[c0,c1]（横向暖色渐变） */
 function lineChart(opts){
-  // opts: values[], xlabels[], ymin, ymax, yunit, color
-  const W=340,H=192,L=36,R=14,T=18,B=30;
+  const W=340,H=192,L=44,R=16,T=20,B=34;
   const pw=W-L-R,ph=H-T-B,n=opts.values.length;
   const xf=i=>L+(n<=1?pw/2:(i/(n-1))*pw);
   const yf=v=>T+(1-(v-opts.ymin)/(opts.ymax-opts.ymin))*ph;
@@ -772,78 +791,151 @@ function lineChart(opts){
     const v=opts.ymin+(opts.ymax-opts.ymin)*g/ticks;
     const y=yf(v);
     grid+='<line class="grid-line" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>';
-    grid+='<text class="axis-label" x="3" y="'+(y+3.5)+'">'+Math.round(v)+'</text>';
+    grid+='<text class="axis-label" x="4" y="'+(y+3.5)+'">'+Math.round(v)+'</text>';
   }
-  grid+='<text class="axis-label" x="3" y="'+(T-5)+'">'+opts.yunit+'</text>';
+  grid+='<text class="axis-label" x="4" y="'+(T-6)+'">'+opts.yunit+'</text>';
   let xl="";const step=Math.max(1,Math.floor(n/6));
   for(let i=0;i<n;i+=step){
-    xl+='<text class="axis-label" x="'+xf(i)+'" y="'+(H-11)+'" text-anchor="middle">'+opts.xlabels[i]+'</text>';
+    xl+='<text class="axis-label" x="'+xf(i)+'" y="'+(H-12)+'" text-anchor="middle">'+opts.xlabels[i]+'</text>';
   }
   const pts=opts.values.map((v,i)=>[xf(i),yf(v)]);
   const d=smoothPath(pts);
   let area="M"+pts[0][0].toFixed(1)+" "+yf(opts.ymin).toFixed(1);
   pts.forEach(p=>area+=" L"+p[0].toFixed(1)+" "+p[1].toFixed(1));
   area+=" L"+pts[n-1][0].toFixed(1)+" "+yf(opts.ymin).toFixed(1)+" Z";
-  const gid="g"+Math.random().toString(36).slice(2,7);
+  let defs="",stroke,areaFill;
+  if(opts.gradient){
+    const gid="g"+Math.random().toString(36).slice(2,8);
+    const sid=gid+"s";
+    defs='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="'+opts.gradient[1]+'" stop-opacity=".26"/>'+
+      '<stop offset="1" stop-color="'+opts.gradient[0]+'" stop-opacity="0"/></linearGradient>'+
+      '<linearGradient id="'+sid+'" x1="0" y1="0" x2="1" y2="0">'+
+      '<stop offset="0" stop-color="'+opts.gradient[0]+'"/><stop offset="1" stop-color="'+opts.gradient[1]+'"/></linearGradient></defs>';
+    stroke='url(#'+sid+')';areaFill='url(#'+gid+')';
+  }else{stroke=opts.color;areaFill=opts.color;}
   let dots="";
   pts.forEach((p,i)=>{
-    if(i===0)dots+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="4" fill="'+opts.color+'" stroke="#fff" stroke-width="1.6"/>';
-    else dots+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.2" fill="'+opts.color+'"/>';
+    if(i===0)dots+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="4" fill="'+stroke+'" stroke="#fff" stroke-width="1.6"/>';
+    else dots+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.2" fill="'+stroke+'"/>';
   });
-  return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%">'+
-    '<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
-    '<stop offset="0" stop-color="'+opts.color+'" stop-opacity=".24"/>'+
-    '<stop offset="1" stop-color="'+opts.color+'" stop-opacity="0"/></linearGradient></defs>'+
-    grid+
-    '<path d="'+area+'" fill="url(#'+gid+')"/>'+
-    '<path d="'+d+'" fill="none" stroke="'+opts.color+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'+
+  const svg=defs+grid+
+    '<path d="'+area+'" fill="'+areaFill+'"/>'+
+    '<path d="'+d+'" fill="none" stroke="'+stroke+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'+
     dots+
     '<line class="axis-line" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'"/>'+
     '<line class="axis-line" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>'+
-    xl+'</svg>';
+    xl;
+  const geo={type:"line",W:W,H:H,xs:pts.map(p=>p[0]),ys:pts.map(p=>p[1]),values:opts.values,labels:opts.xlabels,unit:opts.yunit,
+    fmt:v=>Math.round(v)+"°"};
+  return {svg:'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+svg+'</svg>',geo};
 }
+/* barChart → {svg, geo} */
 function barChart(opts){
-  // values 0..max, xlabels, color, yunit
-  const W=340,H=184,L=34,R=14,T=18,B=30;
+  const W=340,H=184,L=44,R=16,T=20,B=34;
   const pw=W-L-R,ph=H-T-B,n=opts.values.length;
-  const bw=Math.min(11,pw/n*0.66);
+  const bw=Math.min(11,pw/n*0.62);
   const yf=v=>T+(1-v/opts.ymax)*ph;
   let grid="";const ticks=4;
   for(let g=0;g<=ticks;g++){
     const v=opts.ymax*g/ticks;const y=yf(v);
     grid+='<line class="grid-line" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/>';
-    grid+='<text class="axis-label" x="3" y="'+(y+3.5)+'">'+Math.round(v)+'</text>';
+    grid+='<text class="axis-label" x="4" y="'+(y+3.5)+'">'+Math.round(v)+'</text>';
   }
-  grid+='<text class="axis-label" x="3" y="'+(T-5)+'">'+opts.yunit+'</text>';
-  let bars="",xl="",hl="";const step=Math.max(1,Math.floor(n/6));
+  grid+='<text class="axis-label" x="4" y="'+(T-6)+'">'+opts.yunit+'</text>';
+  let bars="",xl="";const step=Math.max(1,Math.floor(n/6));
+  const gid=opts.gradient?("bg"+Math.random().toString(36).slice(2,8)):null;
+  const fill=gid?('url(#'+gid+')'):opts.color;
   for(let i=0;i<n;i++){
-    const x=L+(n<=1?pw/2:((i+0.5)/n)*pw);
+    const x=L+((i+0.5)/n)*pw;
     const v=opts.values[i];const bh=(v/opts.ymax)*ph;const y=T+ph-bh;
-    bars+='<rect x="'+(x-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1.5,bh).toFixed(1)+'" rx="3" fill="'+opts.color+'" opacity="'+(v>0?.92:.2)+'"/>';
-    if(i===0)hl='<rect x="'+(x-bw/2-1.5).toFixed(1)+'" y="'+(y-1.5).toFixed(1)+'" width="'+(bw+3).toFixed(1)+'" height="'+Math.max(1.5,bh+3).toFixed(1)+'" rx="4" fill="none" stroke="'+opts.color+'" stroke-width="1.6"/>';
-    if(i%step===0)xl+='<text class="axis-label" x="'+x.toFixed(1)+'" y="'+(H-11)+'" text-anchor="middle">'+opts.xlabels[i]+'</text>';
+    bars+='<rect x="'+(x-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1.5,bh).toFixed(1)+'" rx="3" fill="'+fill+'" opacity="'+(v>0?.92:.18)+'"/>';
+    if(i%step===0)xl+='<text class="axis-label" x="'+x.toFixed(1)+'" y="'+(H-12)+'" text-anchor="middle">'+opts.xlabels[i]+'</text>';
   }
-  return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%">'+grid+bars+hl+
+  let defs="";
+  if(gid){
+    defs='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#64d2ff"/><stop offset="1" stop-color="#2bb3c0"/></linearGradient></defs>';
+  }
+  const svg=defs+grid+bars+
     '<line class="axis-line" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'"/>'+
-    '<line class="axis-line" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>'+xl+'</svg>';
+    '<line class="axis-line" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>'+xl;
+  const xs=[],ys=[];
+  for(let i=0;i<n;i++){xs.push(L+((i+0.5)/n)*pw);ys.push(yf(opts.values[i]));}
+  const geo={type:"bar",W:W,H:H,xs:xs,ys:ys,values:opts.values,labels:opts.xlabels,unit:opts.yunit,
+    fmt:v=>v.toFixed(1)+" mm"};
+  return {svg:'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+svg+'</svg>',geo};
 }
+/* 交互：竖向指示线 + 数值气泡，吸附到最近的 X 网格点 */
+function bindTip(el,geo){
+  if(!el._tipBuilt){
+    const l=document.createElement("div");l.className="cvline";el.appendChild(l);
+    const t=document.createElement("div");t.className="ctip";el.appendChild(t);
+    el._tipBuilt=true;
+  }
+  el._geo=geo;
+  el.onpointermove=e=>{
+    const g=el._geo;if(!g)return;
+    const r=el.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width*g.W;
+    let idx=0,best=1e9;
+    g.xs.forEach((x,i)=>{const d=Math.abs(x-px);if(d<best){best=d;idx=i;}});
+    const x=g.xs[idx],yv=g.ys[idx];
+    const lEl=el.querySelector(".cvline"),tEl=el.querySelector(".ctip");
+    lEl.style.left=(x/g.W*r.width)+"px";
+    tEl.style.left=(x/g.W*r.width)+"px";
+    tEl.style.top=(yv/g.H*r.height)+"px";
+    tEl.textContent=g.labels[idx]+"  "+g.fmt(g.values[idx]);
+    lEl.style.opacity=.45;tEl.style.opacity=1;
+  };
+  el.onpointerleave=()=>{const l=el.querySelector(".cvline"),t=el.querySelector(".ctip");if(l)l.style.opacity=0;if(t)t.style.opacity=0;};
+}
+function paintLine(el,opts){const r=lineChart(opts);el.innerHTML=r.svg;bindTip(el,r.geo);}
+function paintBar(el,opts){const r=barChart(opts);el.innerHTML=r.svg;bindTip(el,r.geo);}
 
 /* ---------- render ---------- */
 function hourLabels(time,startIdx){
   const out=[];
   for(let i=startIdx;i<time.length;i++){
-    const d=new Date(time[i].replace(" ","T")+"Z"); // timezone=auto gives local wall time; treat as label
     out.push(time[i].slice(11,16));
   }
   return out;
 }
-
+function buildAction(){
+  if(!D.composite||!D.composite.length)return "";
+  const nowH=D.startIdx, c=D.composite[nowH];
+  // 优先看未来 2 小时分钟级
+  if(D.mini&&D.mini.length){
+    const sum=D.mini.reduce((a,b)=>a+b.p,0);
+    const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
+    const peakT=peak.t?peak.t.slice(11,16):"";
+    if(sum<0.05)return "未来两小时基本无雨，放心出门。";
+    let s="未来两小时有雨";
+    if(peak.p>0){
+      s+="（约 "+peakT+" 雨势最大）";
+      const rate=peak.p*4;
+      if(rate>=8)s+="，雨势不小，建议错峰出行或等雨停。";
+      else s+="，出门带伞就行。";
+    }
+    return s;
+  }
+  // 回退：看逐小时综合降水
+  const next2=[D.composite[nowH],D.composite[nowH+1]].filter(Boolean);
+  const willRain=next2.some(x=>x.precip&&x.precip>=0.1);
+  const prob=(D.precipProb[nowH]||0)*100;
+  if(willRain||prob>=40)return "未来一两小时可能下雨，出门带伞更稳妥。";
+  // 温度/风提示
+  const dmax=D.daily.temperature_2m_max[0],dmin=D.daily.temperature_2m_min[0];
+  if(dmax>=35)return "白天偏热（最高 "+Math.round(dmax)+"°），注意补水和防晒。";
+  if(dmin<=0)return "气温在冰点附近，注意保暖防寒。";
+  if(c.wind&&c.wind>=29)return "风力较大（约 "+Math.round(c.wind)+" km/h），注意防风。";
+  return "未来两小时天气平稳，正常安排即可。";
+}
 function render(){
   if(!D.time){return;}
   const t=D.time, n=t.length;
   const startIdx=D.startIdx;
   const labels=hourLabels(t,startIdx);
-  // temp composite
   const temps=[],precs=[],probs=[];
   for(let i=startIdx;i<n;i++){
     const b=D.composite[i];
@@ -851,34 +943,23 @@ function render(){
     precs.push(b.precip!=null?b.precip:0);
     probs.push((D.precipProb[i]||0)*100);
   }
-  // temp range for y
   let tmin=Math.min(...temps),tmax=Math.max(...temps);
   const pad=Math.max(2,(tmax-tmin)*0.15);
-  // lineChart
-  $("#tempChart").innerHTML=lineChart({values:temps,xlabels:labels,ymin:Math.floor(tmin-pad),ymax:Math.ceil(tmax+pad),color:"#ff9f0a",yunit:"°C"});
-  $("#precipChart").innerHTML=barChart({values:probs,xlabels:labels,ymax:100,color:"#0a84ff",yunit:"%"});
+  paintLine($("#tempChart"),{values:temps,xlabels:labels,ymin:Math.floor(tmin-pad),ymax:Math.ceil(tmax+pad),gradient:["#ffd60a","#ff453a"],yunit:"°C"});
+  paintBar($("#precipChart"),{values:probs,xlabels:labels,ymax:100,color:"#2bb3c0",gradient:"miniRain",yunit:"%"});
 
-  // hero
   const cur=D.current;
   const wc=wcode(cur.weather_code);
   const isDay=(now().getHours()>=6&&now().getHours()<19);
-  $("#heroCond").innerHTML=wc[0]+'<div class="csub" id="heroCondSub">'+(isDay?"白天":"夜间")+' · 数据 '+D.srcLabel+'</div>';
+  $("#heroCond").innerHTML=wc[0]+'<div class="csub" id="heroCondSub">湿度 '+Math.round(cur.relative_humidity_2m)+'% · 能见度 '+Math.round((cur.visibility||10000)/1000)+' km</div>';
   $("#heroTemp").textContent=Math.round(cur.temperature_2m)+"°";
   $("#heroFeels").textContent="体感 "+Math.round(cur.apparent_temperature)+"°";
   $("#heroWind").textContent="风 "+Math.round(cur.wind_speed_10m)+" km/h";
   const dmax=D.daily.temperature_2m_max[0],dmin=D.daily.temperature_2m_min[0];
   $("#heroRange").innerHTML="最高 "+Math.round(dmax)+"° · 最低 "+Math.round(dmin)+"°";
   $("#hero").style.background=heroBg(cur.weather_code,isDay);
-  // 顶部数据来源信号：对普通用户有用、看得懂——显示接入源数量 + 一致性白话
-  const conf=computeConfidence();
-  $("#heroConfChip").textContent="数据源 "+conf.liveN+" 家";
-  let cstatus;
-  if(conf.stdev<0.8)cstatus="各源高度一致，预报可靠";
-  else if(conf.stdev<1.6)cstatus="各源基本一致";
-  else cstatus="各源分歧较大，建议留意更新";
-  $("#heroConfSrc").textContent=cstatus;
+  $("#heroAction").textContent=buildAction();
 
-  // strip
   const strip=$("#strip");strip.innerHTML="";
   for(let k=0;k<temps.length;k++){
     const i=startIdx+k;
@@ -890,34 +971,31 @@ function render(){
       '<div class="hi">'+iconSVG(wc2[1],26)+'</div>'+
       '<div class="hr">'+(D.precipProb[i]!=null?Math.round(D.precipProb[i]*100)+"%":"—")+'</div>'+
       '<div class="hp">'+Math.round(b.temp)+'°</div>'+
-      '<div class="hw">'+Math.round(b.wind)+' km/h</div>';
+      '<div class="hw">'+(b.dir!=null?windArrowSVG(b.dir,11):"")+Math.round(b.wind)+'</div>';
     hc.onclick=()=>{selHour=k;renderDetail();$$(".hc").forEach((e,idx)=>e.classList.toggle("sel",idx===k));};
     strip.appendChild(hc);
   }
   renderDetail();
   renderSources();
 
-  // minutely
   if(D.mini&&D.mini.length){
-    const row=$("#miniRow");row.innerHTML="";
-    const maxv=Math.max(0.1,...D.mini.map(x=>x.p));
-    D.mini.forEach(x=>{
-      const bar=document.createElement("div");
-      bar.className="mini-bar";
-      bar.style.height=Math.max(3,(x.p/maxv)*64)+"px";
-      bar.title=x.t.slice(11,16)+" · "+x.p.toFixed(1)+"mm";
-      row.appendChild(bar);
-    });
-    const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
+    const vals=D.mini.map(x=>x.p);
+    const maxv=Math.max(0.5,...vals);
+    const ymax=Math.ceil(maxv*1.2*10)/10;
+    const ml=D.mini.map(x=>x.t.slice(11,16));
+    paintBar($("#miniChart"),{values:vals,xlabels:ml,ymax:ymax,color:"#2bb3c0",gradient:"miniRain",yunit:"mm"});
     const sum=D.mini.reduce((a,b)=>a+b.p,0);
+    const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
     if(sum<0.05){
-      $("#miniCap").innerHTML="未来 2 小时基本没雨，出门不用愁。";
+      $("#miniCap").textContent="未来 2 小时基本没雨，出门不用愁。";
     }else{
       const peakH=(peak.p*4).toFixed(1);
       $("#miniCap").innerHTML="未来 2 小时累计降雨约 <b>"+sum.toFixed(1)+" 毫米</b>。"+
-        (peak.p>0?("雨下得最大的时候大概在 <b>"+peak.t.slice(11,16)+"</b> 前后，强度约 "+peak.p.toFixed(1)+" 毫米/15分钟（相当于每小时 "+peakH+" 毫米）。建议您 <b>错开这个时段</b>再出门或通勤。"):"");
+        (peak.p>0?("雨下得最大的时候大概在 <b>"+peak.t.slice(11,16)+"</b> 前后，强度约 "+peak.p.toFixed(1)+" 毫米/15分钟（相当于每小时 "+peakH+" 毫米）。建议 <b>错开这个时段</b>再出门或通勤。"):"");
     }
     $("#miniCard").style.display="block";
+  }else{
+    $("#miniCard").style.display="none";
   }
 }
 
@@ -926,13 +1004,12 @@ function renderDetail(){
   const b=D.composite[i];
   const labels=hourLabels(D.time,D.startIdx);
   $("#detailTitle").textContent=labels[selHour]+" 时段明细 · 按数据量排序";
-  // order: rainfall first
   const metrics=[
     {n:"降水概率",v:(D.precipProb[i]||0)*100,u:"%",fmt:v=>Math.round(v)+"%",key:"prob"},
     {n:"降水量",v:b.precip,u:"mm",fmt:v=>(v==null?"—":v.toFixed(1)+" mm"),key:"precip"},
     {n:"风速",v:b.wind,u:"km/h",fmt:v=>(v==null?"—":Math.round(v)+" km/h"),key:"wind"},
     {n:"最大瞬时风速",v:b.gust,u:"km/h",fmt:v=>(v==null?"—":Math.round(v)+" km/h"),key:"gust"},
-    {n:"风向",v:b.dir,u:"",fmt:v=>(v==null?"—":windDirText(v)),key:"dir"},
+    {n:"风向",v:b.dir,u:"",fmt:v=>(v==null?"—":windDirText(v)),key:"dir",arrow:true},
     {n:"气温",v:b.temp,u:"°",fmt:v=>(v==null?"—":Math.round(v)+"°"),key:"temp"},
     {n:"体感",v:(b.temp!=null?b.temp-1:null),u:"°",fmt:v=>(v==null?"—":Math.round(v)+"°"),key:"feels"},
     {n:"湿度",v:b.hum,u:"%",fmt:v=>(v==null?"—":Math.round(v)+"%"),key:"hum"},
@@ -944,9 +1021,9 @@ function renderDetail(){
   let html="";
   metrics.forEach(m=>{
     const mv=m.v==null?"—":fmtVal(m,m.v);
-    html+='<div class="metric"><div class="mh"><span class="mn">'+m.n+'</span><span class="mv">'+mv+'</span></div>';
+    const mvHtml=(m.arrow&&m.v!=null)?('<span class="warr" style="color:var(--text)">'+windArrowSVG(m.v,16)+'</span>'+mv):mv;
+    html+='<div class="metric"><div class="mh"><span class="mn">'+m.n+'</span><span class="mv">'+mvHtml+'</span></div>';
     html+='<div class="src">';
-    // sources for this metric
     const srcs=sourceLinesFor(i,m);
     srcs.forEach(s=>{
       html+='<div class="sr"><span class="sn"><span class="dot" style="background:'+s.color+'"></span>'+s.name+(s.ref?'<span class="ref-tag">参考</span>':'')+'</span>'+
@@ -1014,7 +1091,6 @@ function sourceLinesFor(i,m){
       out.push({name:"心知天气 Seniverse · 中国",color:"#ff2d55",val:fmtVal(m,val),w:w,pc:0});
     }
   }
-  // normalize and percent
   const tot=out.reduce((a,b)=>a+b.w,0)||1;
   out.forEach(s=>s.w=Math.round(s.w/tot*100));
   out.sort((a,b)=>b.w-a.w);
@@ -1037,7 +1113,6 @@ function fmtVal(m,v){
 
 function renderSources(){
   const box=$("#srcOverview");box.innerHTML="";
-  // 1) LIVE sources — those with real per-hour values blended into the composite
   D.models.forEach(mod=>{
     const w=Math.round(effWeight(mod.key)/liveWeightSum()*100);
     const curT=mod.temp[D.startIdx]!=null?Math.round(mod.temp[D.startIdx])+"°":"—";
@@ -1052,12 +1127,11 @@ function renderSources(){
     const w=Math.round(effWeight("seniverse")/liveWeightSum()*100);
     box.appendChild(so("心知天气 Seniverse","中国","实时接入","#ff2d55",((useSX.now.temperature!=null?useSX.now.temperature:"?")+"° / "+(useSX.now.visibility!=null?useSX.now.visibility:"?")+"km"),w,null));
   }
-  // 2) PRIOR-only references — cannot fetch from a browser, only contribute to confidence
   const priorItems=DOMESTIC.filter(d=>d.ref);
   if(priorItems.length){
     const div=document.createElement("div");
     div.className="src-divider";
-    div.innerHTML='<span>先验权重 · 不直连</span><small>这些源没有可从浏览器调用的公开接口，因此仅其先验权重参与下方置信度评估，不进入逐时综合值计算。</small>';
+    div.innerHTML='<span>先验权重 · 不直连</span><small>这些源没有可从浏览器调用的公开接口，仅其先验权重参与下方置信度评估，不进入逐时综合值计算。</small>';
     box.appendChild(div);
     const priorTot=priorItems.reduce((a,d)=>a+d.prior,0)||1;
     priorItems.forEach(d=>{
@@ -1065,8 +1139,8 @@ function renderSources(){
       box.appendChild(so(d.name,d.country,d.org,d.color,d.note,w,"不直连"));
     });
   }
-  // 3) Confidence score
   const conf=computeConfidence();
+  $("#srcCount").textContent=conf.liveN+" 家接入";
   const confEl=document.createElement("div");
   confEl.className="conf-box";
   let cword = conf.stdev<0.8?"目前各源结论高度一致，可信度高。":conf.stdev<1.6?"目前各源结论基本一致。":"目前各源分歧较大，建议以临近更新为准。";
@@ -1075,12 +1149,11 @@ function renderSources(){
     '这个百分比只代表「多源一致程度 + 资料支撑强度」，不是降雨概率，仅供参考。</div>';
   box.appendChild(confEl);
 
-  // 4) srcNote — full weights audit + formula + sources rationale
   $("#srcNote").innerHTML=
     "<b>综合预报是怎么来的？</b> 把能直接取数的几家预报（含您填的国内源）按各自可信度加权求平均。可信度来自公开的预报准确率评测，也会随您在「校准」里记录的实测自动微调。"+
     "<br><br><b>为什么每个项目单独算权重？</b> 气温、降水、风、湿度……各家强弱不同，所以不套一个总权重。比如 AIFS 在湿度上最强，它在「湿度」这项的权重就最高；ECMWF、ICON 在降水上更强，它们降水的权重就更高。下方「逐变量权重」可逐项查看。"+
     "<br><br><b>逐变量权重明细</b>（默认无校准时，按评测技巧归一化，合计 100%）：<br>"+weightBreakdown()+
-    "<br><br><b>国际源（9 家全球/洲际预报中心）</b>：已按您要求移除法国、加拿大两家，它们的权重按比例分给了其余 9 家。"+
+    "<br><br><b>国际源（8 家全球/洲际预报中心）</b>：已按您要求移除法国、加拿大、挪威三家，它们的权重按比例分给了其余 8 家。"+
     "<br>· 国内可直连（需填密钥）：和风、心知、彩云"+
     "<br>· 国内未直连：CMA、墨迹、MSN 等没有可从网页直接调用的接口，仅作可信度参考，不计入逐时综合。想用真实国内数据，请在设置里填入彩云 / 和风 / 心知密钥。";
   renderVarWeights();
@@ -1120,7 +1193,6 @@ function setupCal(){
     const t=parseFloat($("#calTemp").value),p=parseFloat($("#calPrec").value);
     if(isNaN(t)){toast("请输入实况气温");return;}
     const i=D.startIdx;
-    // update each model's temp & precip EMA
     D.models.forEach(m=>{
       const f=m.temp[i];if(f==null)return;
       const key=m.key;let c=ST.cal[key]||{tempEma:0,precEma:0,n:0};
@@ -1146,8 +1218,6 @@ function initMap(){
   window.__leafletReady.then(function(){
     if(typeof L==="undefined"){toast("地图组件加载失败，请检查网络");return;}
     map=L.map("map",{maxBounds:[[3,73],[54,135]],maxBoundsViscosity:.7,worldCopyJump:false}).setView([ST.lastLat||APP.lat,ST.lastLng||APP.lng],ST.lastLat?6:4);
-    // 高德底图：国内手机网络可访问（OSM 官方瓦片在国内常被墙）。高德为 GCJ-02 偏移坐标，
-    // 用于天气查询的百米级误差可忽略；如需精确坐标请用「手动输入 lat,lng」。
     L.tileLayer("https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}",{subdomains:"1234",maxZoom:18,attribution:"© 高德地图"}).addTo(map);
   marker=L.marker([ST.lastLat||APP.lat,ST.lastLng||APP.lng],{draggable:true}).addTo(map);
   marker.on("dragend",()=>{const ll=marker.getLatLng();reverse(ll.lat,ll.lng);});
@@ -1165,11 +1235,11 @@ async function reverse(lat,lng){
   }catch(e){$("#mapAddr").textContent=lat.toFixed(4)+", "+lng.toFixed(4);}
 }
 async function geoSearch(q){
-  const res=$("#geoRes");res.innerHTML='<div style="color:var(--label)">搜索中…</div>';
+  const res=$("#geoRes");res.innerHTML='<div style="color:var(--secondary)">搜索中…</div>';
   try{
     const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=6&accept-language=zh-CN&q="+encodeURIComponent(q));
     const j=await r.json();
-    if(!j.length){res.innerHTML='<div style="color:var(--label)">未找到，换关键词试试</div>';return;}
+    if(!j.length){res.innerHTML='<div style="color:var(--secondary)">未找到，换关键词试试</div>';return;}
     res.innerHTML="";
     j.forEach(p=>{
       const d=document.createElement("div");
@@ -1177,7 +1247,7 @@ async function geoSearch(q){
       d.onclick=()=>{setLoc(+p.lat,+p.lon,p.display_name.split(",")[0],p.display_name);switchView("v-weather");};
       res.appendChild(d);
     });
-  }catch(e){res.innerHTML='<div style="color:var(--red)">搜索失败（需联网）</div>';}
+  }catch(e){res.innerHTML='<div style="color:var(--bad)">搜索失败（需联网）</div>';}
 }
 function setLoc(lat,lng,name,sub){
   ST.lastLat=lat;ST.lastLng=lng;ST.lastName=name;ST.lastSub=sub||"";save();
@@ -1303,15 +1373,14 @@ function computeConfidence(){
   const mean=ts.length?ts.reduce((a,b)=>a+b,0)/ts.length:0;
   const variance=ts.length?ts.reduce((a,b)=>a+(b-mean)*(b-mean),0)/ts.length:0;
   const stdev=Math.sqrt(variance);
-  const priorSum=DOMESTIC.filter(d=>d.ref).reduce((a,d)=>a+d.prior,0); // 0.13+0.10+0.07+0.06=0.36
+  const priorSum=DOMESTIC.filter(d=>d.ref).reduce((a,d)=>a+d.prior,0);
   const score=Math.max(35,Math.min(99,Math.round(50+liveN*5-stdev*4+priorSum*100)));
   return {score,liveN,stdev,priorSum,
     detail:`基线 50 ＋ 直连数 ${liveN} × 5 − 温度离散 ${stdev.toFixed(1)}° × 4 ＋ 先验权重和 ${(priorSum*100).toFixed(0)}%`};
 }
 function weightBreakdown(){
-  // 逐变量权重（9 家国际中心，按 SKILL 技巧归一化到合计 100%）
   const keys=Object.keys(SKILL);
-  let s="<b>逐变量权重</b>（9 家国际 NWP 中心，按公开评测技巧归一化，合计 100%）：<br>";
+  let s="<b>逐变量权重</b>（8 家国际 NWP 中心，按公开评测技巧归一化，合计 100%）：<br>";
   keys.forEach(vk=>{
     const col=SKILL[vk];let tot=0;for(const k in col)tot+=col[k];
     const parts=MODELS.filter(m=>col[m.key]!=null&&col[m.key]>0)
@@ -1389,10 +1458,9 @@ async function loadAll(){
     }else{
       D.time=ftime;
       D.precipProb=fc.hourly.precipitation_probability?fc.hourly.precipitation_probability.map(v=>(v||0)/100):fc.hourly.precipitation.map(v=>v>0?1:0);
-      const mk=(temp,precip,wind,hum,pres,cloud,vis)=>({key:"om",name:"Open-Meteo",org:"综合模式",prior:1,color:"#0a84ff",temp,precip,wind,hum,pres,cloud,vis});
+      const mk=(temp,precip,wind,hum,pres,cloud,vis)=>({key:"om",name:"Open-Meteo",org:"综合模式",prior:1,color:"#5e5ce6",temp,precip,wind,hum,pres,cloud,vis});
       models=[mk(fc.hourly.temperature_2m,fc.hourly.precipitation,fc.hourly.wind_speed_10m,fc.hourly.relative_humidity_2m,fc.hourly.pressure_msl,fc.hourly.cloud_cover,fc.hourly.visibility)];
     }
-    // Caiyun (real, browser-fetchable when KEY provided) → live source
     if(useCY){
       const cy=parseCaiyun(useCY,D.time);
       if(cy){
@@ -1400,7 +1468,6 @@ async function loadAll(){
           temp:cy.temp,precip:cy.precip,wind:cy.wind,hum:cy.hum,pres:cy.pres,cloud:cy.cloud,vis:cy.vis});
       }
     }
-    // Seniverse / 心知天气 (real, browser-fetchable when KEY provided) → live source
     if(useSX){
       const sx=parseSeniverse(useSX,D.time);
       if(sx){
@@ -1408,25 +1475,21 @@ async function loadAll(){
           temp:sx.temp,precip:sx.precip,wind:sx.wind,gust:sx.gust,dir:sx.dir,hum:sx.hum,pres:sx.pres,cloud:sx.cloud,vis:sx.vis,uv:sx.uv});
       }
     }
-    // src label reflects live sources
     const intlN=models.filter(m=>MODELS.find(x=>x.key===m.key)).length;
     let lbl=intlN>1?("多源数值集合 · "+intlN+" 个国际模式"):"Open-Meteo 综合";
     if(useCY&&models.find(m=>m.key==="caiyun"))lbl+=" · 彩云";
     if(useQW)lbl+=" · 和风";
     if(useSX&&models.find(m=>m.key==="seniverse"))lbl+=" · 心知";
     D.srcLabel=lbl;
-    // composite per hour (includes caiyun if connected)
     const composite=[];
     const len=D.time.length;
     for(let i=0;i<len;i++){
       composite.push(blendMap(models,i));
     }
-    // advance startIdx only past fully-empty leading hours (never skip the current hour)
     for(let i=startIdx;i<composite.length;i++){
       let c=0;for(const m of models){if(m.temp[i]!=null)c++;}
       if(c>=1){startIdx=i;break;}
     }
-    // hour weather code approximated from cloud/precip
     const hourCode=new Array(len).fill(3);
     for(let i=0;i<len;i++){
       const c=composite[i];
@@ -1441,18 +1504,8 @@ async function loadAll(){
     D.startIdx=startIdx;
     D.current=fc.current;
     D.daily=fc.daily;
-    // minutely
-    if(mini&&mini.minutely_15){
-      const mt=mini.minutely_15.time,mp=mini.minutely_15.precipitation||[];
-      const nowMs=nowStr.getTime();
-      D.mini=[];
-      for(let i=0;i<mt.length;i++){
-        const ts=new Date(mt[i].replace(" ","T")+"Z").getTime();
-        if(ts>=nowMs-60000)D.mini.push({t:mt[i],p:mp[i]||0});
-        if(D.mini.length>=8)break;
-      }
-    }else D.mini=null;
-    // QWeather override current temp if available
+    // 分钟级降水：三级回退（原生 → 逐小时推算 → 空态）
+    D.mini=buildMini(mini,composite,startIdx,nowStr);
     if(useQW&&useQW.now){
       D.current.temperature_2m=parseFloat(useQW.now.temp);
       D.current.apparent_temperature=parseFloat(useQW.now.feelsLike);
@@ -1465,26 +1518,49 @@ async function loadAll(){
   }
   loading=false;
 }
+/* 未来 2 小时分钟级降水（免费方案，不依赖付费雷达源）
+   L1: Open-Meteo minutely_15 原生 15 分钟降水
+   L2: 无原生数据时，由逐小时综合降水量按 15 分钟均匀摊分（免费推算）
+   两者皆空 → 返回 null（模块隐藏，不画假数据） */
+function buildMini(mini,composite,startIdx,nowStr){
+  const nowMs=nowStr.getTime();
+  let pts=[];
+  if(mini&&mini.minutely_15&&mini.minutely_15.time){
+    const mt=mini.minutely_15.time, mp=mini.minutely_15.precipitation||[];
+    for(let i=0;i<mt.length;i++){
+      const ts=new Date(mt[i].replace(" ","T")+"Z").getTime();
+      if(ts>=nowMs-60000)pts.push({t:mt[i],p:mp[i]||0});
+      if(pts.length>=8)break;
+    }
+  }
+  if(!pts.length&&composite&&composite.length){
+    const hi=startIdx;
+    for(let k=0;k<8;k++){
+      const idx=hi+Math.floor(k/4);
+      const v=composite[idx]?composite[idx].precip:0;
+      const chunk=Math.max(0,v/4);
+      pts.push({t:fmtLocal(new Date(nowMs+k*15*60000)),p:chunk});
+    }
+  }
+  return pts.length?pts:null;
+}
 
 /* ---------- geolocation on first run ---------- */
 function boot(){
   load();
   setupNav();setupSheet();setupCal();setupLoc();
   enableDragScroll($("#strip"));
-  // default location: last used
   if(ST.lastLat!=null&&ST.lastLng!=null){
     APP.lat=ST.lastLat;APP.lng=ST.lastLng;APP.name=ST.lastName||"位置";APP.sub=ST.lastSub||"";
     $("#locName").innerHTML=APP.name+'<small>'+APP.sub+'</small>';
   }else{
-    // try geolocation
     if(navigator.geolocation){
       navigator.geolocation.getCurrentPosition(pos=>{
         APP.lat=pos.coords.latitude;APP.lng=pos.coords.longitude;
         reverseLoc(APP.lat,APP.lng);
-      },()=>{ /* keep default */ },{timeout:8000});
+      },()=>{ },{timeout:8000});
     }
   }
-  // tick clock
   setInterval(()=>{
     const d=now();
     $("#syncBox").innerHTML="时间 · "+syncLabel+'<br><b>'+fmtClock(d)+'</b>';
@@ -1503,7 +1579,6 @@ function reverseLoc(lat,lng){
     }).catch(()=>{$("#locName").innerHTML="已定位"+'<small>'+lat.toFixed(2)+","+lng.toFixed(2)+'</small>';});
 }
 
-// refresh every 10 min re-sync
 setInterval(()=>{syncTime().then(l=>syncLabel=l);},600000);
 document.addEventListener("DOMContentLoaded",()=>{syncTime().then(l=>syncLabel=l);boot();});
 })();

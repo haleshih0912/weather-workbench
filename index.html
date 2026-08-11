@@ -66,7 +66,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .axis-line{stroke:var(--sub);stroke-width:.8;opacity:.6}
 
 /* hourly strip */
-.strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none}
+.strip{display:flex;gap:10px;overflow-x:auto;padding:4px 6px 12px 12px;scroll-snap-type:x proximity;scroll-padding-left:12px;-webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none}
 .strip.dragging{cursor:grabbing;scroll-snap-type:none}
 .strip::-webkit-scrollbar{height:6px}
 .strip::-webkit-scrollbar-track{background:transparent;margin:0 2px}
@@ -240,7 +240,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
           <span id="heroWind">风 --</span>
         </div>
         <div class="hero-range" id="heroRange">最高 --° · 最低 --°</div>
-        <div class="hero-conf" id="heroConf"><span class="chip">置信度 <b id="heroConfPct">--%</b></span><span id="heroConfSrc">直连 0 · 先验 0</span></div>
+        <div class="hero-conf" id="heroConf"><span class="chip" id="heroConfChip">数据源 --</span><span id="heroConfSrc">加载中…</span></div>
       </div>
     </div>
 
@@ -256,13 +256,13 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 
     <div class="card" id="miniCard" style="display:none">
       <h3>未来 2 小时分钟级降水</h3>
-      <div class="note" style="margin-bottom:8px">以 15 分钟为粒度，告诉你「接下来两小时哪一刻会下雨、下多大」，用于短时出行决策（带伞、等雨停、错峰通勤）。它与上方逐小时综合不同：综合是多源平滑后的平均，这里是高时间分辨率的临近预报。</div>
+      <div class="note" style="margin-bottom:8px">未来两小时，重点看会不会下雨、啥时候下、下多大。每 15 分钟报一次，专门帮您做短安排：现在出门带不带伞、要不要等雨停了再走、通勤能不能错开雨大的时候。它和上面的「逐小时预报」不是一回事——逐小时是各家平均出来的大致走势，这里是精细到每一刻的临近预报，两者搭着看更准。</div>
       <div class="mini-row" id="miniRow"></div>
       <div class="mini-cap" id="miniCap"></div>
     </div>
 
     <div class="card">
-      <h3>逐小时 · 点选查看来源</h3>
+      <h3>逐小时预报</h3>
       <div class="strip" id="strip"></div>
     </div>
 
@@ -276,9 +276,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
       <div class="note" id="srcNote" style="margin-bottom:10px"></div>
     <div class="src-ov" id="srcOverview"></div>
   </div>
-  <div class="card">
-    <h3>逐变量权重 · 具体问题具体分析 <span class="tag">新</span></h3>
-    <div class="note">不同模式在不同天气项目上各有擅长，不再用「一个整体权重」代表一切。下方按你选择的变量，展示 9 家国际 NWP 中心各自的权重（按公开评测技巧归一化到合计 100%）。例：AIFS 不输出相对湿度→湿度权重为 0；ECMWF/ICON 在降水上更强→其降水权重高于整体。</div>
+    <div class="card">
+      <h3>逐变量权重</h3>
+      <div class="note">不同模式在不同天气项目上各有擅长，所以这里不套用一个总权重，而是按您选的项目，分别给出 9 家国际预报中心各自的权重（依据公开评测技巧，合计 100%）。比如 AIFS 在湿度上最强，它在「湿度」这项的权重就最高。</div>
     <select id="varSel" class="vsel"></select>
     <div class="note" id="varEvid" style="margin:8px 0 4px;color:var(--sub);font-size:11px"></div>
     <div id="varWeights"></div>
@@ -453,37 +453,42 @@ const DOMESTIC=[
   {key:"seniverse",name:"心知天气 Seniverse",org:"实时+逐小时+指数",country:"中国",prior:.09,color:"#ff2d55",ref:false,note:"浏览器直连（需密钥），已接入实时参与"}
 ];
 
-/* ---------- 逐变量技巧矩阵 ----------
+/* ---------- 逐变量技巧矩阵（v2：2024–2026 公开评测复核）----------
    逐变量「技巧指数」(0–100)：依据公开评测，对 9 家国际 NWP 中心在每个天气项目上的相对能力打分。
    该变量的权重 = 各家技巧指数 ÷ 各家之和（归一化到合计 1.0）。
-   标注 [推] 的变量为依据模式特性（而非单篇定量论文）的合理推断。
-   证据：
-   · temp/wind/precip：KAUST/EGU26(2024-09~2025-11) — AIFS 在温度/降水/风全时效技巧最高；
-     IFS 紧随；ICON 为最强传统模式；GEFS(GFS)整体垫底。
-   · hum：AIFS 不输出相对湿度（KAUST 原文 "relative humidity is unavailable from AIFS"）→ 湿度权重置 0。
-   · gust/dir：[推] DWD(ICON) 以风场/阵风见长；AIFS 因 31km 分辨率对阵风刻画偏弱。
-   · pres/cloud/vis/uv：各模式差异很小（气压同化好、云/能见度/UV 多为派生或诊断量）→ 权重趋于平缓。
+   标注 [推] 的变量为依据模式物理特性（而非单篇定量论文）的合理推断。
+   证据（均来自 2024–2026 公开评测 / 论文）：
+   · 温度：突尼斯 2025（30 站）ICON 温度 RMSE 最低；比利时 2025（22 站）AIFS 在 2–6 天最佳、ICON-D2 在 48h 内最佳；
+     ECMWF 2025 年报 AIFS 在多数地面变量上误差比 IFS 低 5–15%。
+   · 降水：KAUST/EGU26（2024-09~2025-11）AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；ECMWF 2025 年报 AIFS 降水技巧优于 IFS 约 10%；
+     突尼斯 2025 实测 IFS 降水 MAE 最低。
+   · 风：以色列 IMS 实测 ECMWF 风场最优；比利时 2025 ICON-D2 在 48h 内最优；arxiv(2606.02508) 指出原始风场 IFS 集合优于 AIFS，后处理后才接近
+     （与 KAUST「AIFS 风速最高」结论有分歧，本表取折中）。
+   · 阵风/风向：[推] DWD(ICON) 以风场/阵风见长；AIFS 因强度偏弱（TC 强度偏差）对极端阵风刻画略逊，故 ICON/ECMWF 略高。
+   · 湿度：比利时 2025（22 站）实测 AIFS 在所有预见期湿度最优（Open-Meteo 由 AIFS 比湿/露点反算 RH，并非「不输出」）；
+     ICON-D2 在短预见期次之；ECMWF 露点误差 2025 年降约 10%。→ 上一版「AIFS 湿度=0」已据此修正。
+   · 气压/云量/能见度/紫外线：各模式差异很小（气压同化好、其余多为派生/诊断量）→ 权重趋于平缓。
 */
 const SKILL={
-  temp:  {ecmwf:97,ecmwf025:88,aifs:100,icon:93,kma:78,ukmo:84,jma:80,gfs:70,metno:64},
-  precip:{ecmwf:96,ecmwf025:86,aifs:100,icon:90,kma:78,ukmo:84,jma:80,gfs:70,metno:64},
-  wind:  {ecmwf:94,ecmwf025:88,aifs:100,icon:92,kma:79,ukmo:85,jma:80,gfs:72,metno:65},
-  gust:  {ecmwf:95,ecmwf025:85,aifs:88, icon:96,kma:80,ukmo:86,jma:82,gfs:75,metno:70}, // [推]
-  dir:   {ecmwf:95,ecmwf025:88,aifs:94, icon:93,kma:80,ukmo:86,jma:82,gfs:76,metno:70}, // [推]
-  hum:   {ecmwf:98,ecmwf025:88,aifs:0,  icon:92,kma:80,ukmo:85,jma:82,gfs:74,metno:70}, // AIFS 不输出湿度
-  pres:  {ecmwf:95,ecmwf025:88,aifs:92, icon:90,kma:84,ukmo:88,jma:85,gfs:80,metno:82}, // 平缓
-  cloud: {ecmwf:93,ecmwf025:87,aifs:90, icon:92,kma:83,ukmo:86,jma:84,gfs:80,metno:80}, // 平缓
-  vis:   {ecmwf:92,ecmwf025:87,aifs:90, icon:91,kma:83,ukmo:86,jma:84,gfs:80,metno:80}, // 平缓
-  uv:    {ecmwf:92,ecmwf025:87,aifs:90, icon:91,kma:83,ukmo:86,jma:84,gfs:80,metno:81}  // 平缓
+  temp:  {ecmwf:95,ecmwf025:88,aifs:100,icon:97,kma:79,ukmo:84,jma:80,gfs:71,metno:64},
+  precip:{ecmwf:97,ecmwf025:87,aifs:100,icon:90,kma:78,ukmo:84,jma:80,gfs:71,metno:64},
+  wind:  {ecmwf:97,ecmwf025:88,aifs:93, icon:96,kma:79,ukmo:85,jma:80,gfs:72,metno:66},
+  gust:  {ecmwf:96,ecmwf025:86,aifs:89, icon:97,kma:80,ukmo:86,jma:82,gfs:75,metno:70}, // [推]
+  dir:   {ecmwf:96,ecmwf025:88,aifs:93, icon:94,kma:80,ukmo:86,jma:82,gfs:76,metno:70}, // [推]
+  hum:   {ecmwf:94,ecmwf025:88,aifs:100,icon:96,kma:80,ukmo:85,jma:82,gfs:74,metno:70}, // 比利时2025：AIFS 湿度最优
+  pres:  {ecmwf:95,ecmwf025:90,aifs:94, icon:93,kma:87,ukmo:89,jma:88,gfs:82,metno:84}, // 平缓
+  cloud: {ecmwf:93,ecmwf025:89,aifs:92, icon:92,kma:85,ukmo:88,jma:87,gfs:82,metno:83}, // 平缓
+  vis:   {ecmwf:93,ecmwf025:89,aifs:91, icon:92,kma:84,ukmo:87,jma:85,gfs:81,metno:83}, // 平缓
+  uv:    {ecmwf:93,ecmwf025:89,aifs:92, icon:92,kma:84,ukmo:87,jma:85,gfs:81,metno:84}  // 平缓
 };
 const VAR_LABEL={temp:"气温",precip:"降水量",wind:"风速",gust:"最大瞬时风速",dir:"风向",hum:"湿度",pres:"气压",cloud:"云量",vis:"能见度",uv:"紫外线强度"};
 const VAR_EVID={
-  temp:"KAUST/EGU26：AIFS 温度技巧全时效最高，IFS 紧随，ICON 为最强传统模式。",
-  precip:"KAUST：AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；突尼斯 2025：IFS 降水 MAE 最低。",
-  wind:"KAUST：AIFS 风速技巧最高；ECMWF/GFS 飓风案例：物理量风场 ECMWF 优。",
-  gust:"[推断] DWD(ICON) 以风场/阵风著称；AIFS 因 31km 分辨率刻画阵风偏弱，故略降。",
-  dir:"[推断] 随风场，与 wind 同序。",
-  hum:"AIFS 不输出相对湿度（KAUST 原文），故湿度权重为 0；ECMWF 露点误差 2025 年降 10%。",
+  temp:"突尼斯 2025（30 站）：ICON 温度误差最低；比利时 2025：AIFS 在 2–6 天最佳；ECMWF 2025 年报 AIFS 地面变量误差比 IFS 低 5–15%。",
+  precip:"KAUST/EGU26：AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；ECMWF 2025：AIFS 降水技巧优于 IFS 约 10%；突尼斯 2025：IFS 降水误差最低。",
+  wind:"以色列 IMS 实测 ECMWF 风场最优；比利时 2025 ICON-D2 在 48h 内最优；arxiv(2606.02508)：原始风场 IFS 集合优于 AIFS，结论有分歧取折中。",
+  gust:"[推断] DWD(ICON) 以风场/阵风见长；AIFS 因强度偏弱（TC 强度偏差）对极端阵风刻画略逊，故 ICON/ECMWF 略高。",
+  dir:"[推断] 随风场，与 wind 同序；IMS 实测 ECMWF 风矢量最优。",
+  hum:"比利时 2025（22 站）：AIFS 在所有预见期湿度最优；ICON-D2 短预见期次之；Open-Meteo 由 AIFS 比湿/露点反算相对湿度，并非不输出。",
   pres:"气压同化良好、各模式差异极小 → 权重趋于平缓。",
   cloud:"云量为各模式共同难点 → 权重趋于平缓。",
   vis:"能见度由云/雾派生 → 权重趋于平缓。",
@@ -864,10 +869,14 @@ function render(){
   const dmax=D.daily.temperature_2m_max[0],dmin=D.daily.temperature_2m_min[0];
   $("#heroRange").innerHTML="最高 "+Math.round(dmax)+"° · 最低 "+Math.round(dmin)+"°";
   $("#hero").style.background=heroBg(cur.weather_code,isDay);
-  // confidence chip
+  // 顶部数据来源信号：对普通用户有用、看得懂——显示接入源数量 + 一致性白话
   const conf=computeConfidence();
-  $("#heroConfPct").textContent=conf.score+"%";
-  $("#heroConfSrc").textContent="直连 "+conf.liveN+" · 先验 "+(conf.priorSum*100).toFixed(0)+"%";
+  $("#heroConfChip").textContent="数据源 "+conf.liveN+" 家";
+  let cstatus;
+  if(conf.stdev<0.8)cstatus="各源高度一致，预报可靠";
+  else if(conf.stdev<1.6)cstatus="各源基本一致";
+  else cstatus="各源分歧较大，建议留意更新";
+  $("#heroConfSrc").textContent=cstatus;
 
   // strip
   const strip=$("#strip");strip.innerHTML="";
@@ -902,11 +911,11 @@ function render(){
     const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
     const sum=D.mini.reduce((a,b)=>a+b.p,0);
     if(sum<0.05){
-      $("#miniCap").innerHTML="未来 2 小时无明显降雨，可放心安排出行。";
+      $("#miniCap").innerHTML="未来 2 小时基本没雨，出门不用愁。";
     }else{
       const peakH=(peak.p*4).toFixed(1);
-      $("#miniCap").innerHTML="未来 2 小时预计累计降雨约 <b>"+sum.toFixed(1)+" 毫米</b>。"+
-        (peak.p>0?("降雨最强时段在 <b>"+peak.t.slice(11,16)+"</b> 前后，强度约 "+peak.p.toFixed(1)+" 毫米/15分钟（≈"+peakH+" 毫米/小时）。"):"");
+      $("#miniCap").innerHTML="未来 2 小时累计降雨约 <b>"+sum.toFixed(1)+" 毫米</b>。"+
+        (peak.p>0?("雨下得最大的时候大概在 <b>"+peak.t.slice(11,16)+"</b> 前后，强度约 "+peak.p.toFixed(1)+" 毫米/15分钟（相当于每小时 "+peakH+" 毫米）。建议您 <b>错开这个时段</b>再出门或通勤。"):"");
     }
     $("#miniCard").style.display="block";
   }
@@ -1060,20 +1069,20 @@ function renderSources(){
   const conf=computeConfidence();
   const confEl=document.createElement("div");
   confEl.className="conf-box";
-  confEl.innerHTML='<div class="conf-head">整体置信度 <b>'+conf.score+'%</b><span style="color:var(--label);font-weight:500;font-size:11px">基于多源一致性 + 先验支撑</span></div>'+
-    '<div class="conf-detail">计算公式：<code>50 ＋ 直连数×5 − 温度σ×4 ＋ 先验权重和×100</code><br>当前输入：直连 <b>'+conf.liveN+'</b> · 温度离散 σ <b>'+conf.stdev.toFixed(2)+'°</b> · 先验权重和 <b>'+(conf.priorSum*100).toFixed(0)+'%</b><br>= <b>'+conf.score+'%</b></div>';
+  let cword = conf.stdev<0.8?"目前各源结论高度一致，可信度高。":conf.stdev<1.6?"目前各源结论基本一致。":"目前各源分歧较大，建议以临近更新为准。";
+  confEl.innerHTML='<div class="conf-head">预报可信度 <b>'+conf.score+'%</b></div>'+
+    '<div class="conf-detail">我们综合了 '+conf.liveN+' 个能直接取数的预报源。'+cword+
+    '这个百分比只代表「多源一致程度 + 资料支撑强度」，不是降雨概率，仅供参考。</div>';
   box.appendChild(confEl);
 
   // 4) srcNote — full weights audit + formula + sources rationale
   $("#srcNote").innerHTML=
-    "<b>综合公式</b>：综合值 = Σ(<b>直连源</b>实时数值 × 有效权重) ÷ Σ有效权重。"+
-    "有效权重 = 先验可信度 × 校准因子。校准因子 = 1 ÷ (EMA误差² + 0.4)，由「校准」面板的实测记录驱动，记录越多越准。"+
-    "<br><br><b>权重不再是一个整体</b>：摒弃「单一权重代表一切」的做法，改为<b>逐天气项目独立量化</b>——每个变量（气温/降水/风/阵风/风向/湿度/气压/云量/能见度/紫外线）都按各家在该项目上的公开评测技巧单独归一化。依据：KAUST/EGU26(2024-09~2025-11) 显示 AIFS 在温度/降水/风全时效技巧最高、ICON 为最强传统模式、GEFS(GFS) 整体垫底；突尼斯 2025 实测显示 IFS 降水 MAE 最低；AIFS 不输出相对湿度（KAUST 原文），故其湿度权重为 0。"+
-    "<br><br><b>逐变量权重明细</b>（默认无校准时，按技巧归一化；下方「逐变量权重」卡片可逐项查看）：<br>"+weightBreakdown()+
-    "<br><br><b>国际源（9 个全球/洲际 NWP 中心，Open-Meteo models= 确定性集合）</b>：<b>法国 ARPEGE(0.08) 与加拿大 GEM(0.06) 已按你的要求移除</b>，其原合计 0.14 的权重已按其余 9 家原有可信度比例重新分配（新权重 = 原权重 ÷ 1.14，再归一化）。"+
-    "<br>· 国内可直连（浏览器 fetch，需 KEY）：和风 QWeather — Apple 中国数据源(0.11) · 心知 Seniverse — 实时+指数(0.09) · 彩云 — 分钟级降水(0.07)" +
-    "<br>· 国内不可直连：CMA GRAPES 中国区降水 >10mm 阈值优于 ECMWF(0.13) · 墨迹 2024 全球第一 24h 误差≈0.8°C(0.10) · MSN 微软多模型聚合(0.06)"+
-    "<br><br><b>关于「不直连」</b>：CMA/墨迹/MSN 均没有可从浏览器调用的公开 CORS 接口，因此无法获取它们的原始逐时数据。其先验权重仅用于置信度评估，<b>不</b>进入逐时综合值计算。要获得真实国内源数据，请在数据设置面板填入 <b>彩云 KEY</b> / <b>和风 KEY</b> / <b>心知 KEY</b>（三者都支持浏览器直连）。";
+    "<b>综合预报是怎么来的？</b> 把能直接取数的几家预报（含您填的国内源）按各自可信度加权求平均。可信度来自公开的预报准确率评测，也会随您在「校准」里记录的实测自动微调。"+
+    "<br><br><b>为什么每个项目单独算权重？</b> 气温、降水、风、湿度……各家强弱不同，所以不套一个总权重。比如 AIFS 在湿度上最强，它在「湿度」这项的权重就最高；ECMWF、ICON 在降水上更强，它们降水的权重就更高。下方「逐变量权重」可逐项查看。"+
+    "<br><br><b>逐变量权重明细</b>（默认无校准时，按评测技巧归一化，合计 100%）：<br>"+weightBreakdown()+
+    "<br><br><b>国际源（9 家全球/洲际预报中心）</b>：已按您要求移除法国、加拿大两家，它们的权重按比例分给了其余 9 家。"+
+    "<br>· 国内可直连（需填密钥）：和风、心知、彩云"+
+    "<br>· 国内未直连：CMA、墨迹、MSN 等没有可从网页直接调用的接口，仅作可信度参考，不计入逐时综合。想用真实国内数据，请在设置里填入彩云 / 和风 / 心知密钥。";
   renderVarWeights();
 }
 function so(name,country,org,color,dt,wk,ref){
@@ -1310,7 +1319,7 @@ function weightBreakdown(){
       .map(m=>{const nm=m.name.replace("ECMWF ","").replace(" (德国 DWD)","");return nm+" "+Math.round(col[m.key]/tot*100)+"%";});
     s+="· <b>"+VAR_LABEL[vk]+"</b>："+parts.join(" · ")+"<br>";
   });
-  s+="<br><b>说明</b>：各变量独立归一化，因此某模式在降水上权重高、不代表它在湿度上也高（如 AIFS 湿度权重为 0）。国内源（CMA/墨迹/MSN/彩云/和风/心知）不参与国际网格归一化，按各自先验单独计入置信度。";
+  s+="<br><b>说明</b>：各变量独立归一化，因此某模式在降水上权重高、不代表它在湿度上也高（如 AIFS 在湿度上权重最高）。国内源（CMA/墨迹/MSN/彩云/和风/心知）不参与国际网格归一化，按各自先验单独计入置信度。";
   return s;
 }
 function renderVarWeights(){

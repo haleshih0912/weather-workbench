@@ -33,7 +33,7 @@
   --glass:rgba(255,255,255,.72);
   --glass-strong:rgba(255,255,255,.82);
   --shadow-card:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06),0 24px 60px rgba(0,0,0,.04);
-  --shadow-hero:0 1px 2px rgba(0,0,0,.10),0 12px 40px rgba(0,0,0,.18),0 32px 80px rgba(0,0,0,.12);
+  --shadow-hero:0 8px 24px rgba(0,0,0,.10),0 24px 60px rgba(0,0,0,.06);
   --shadow-hc:0 1px 1px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.05);
   /* 圆角（必须配 corner-shape: squircle 才接近 iOS 真实超椭圆） */
   --r-card:26px;
@@ -118,6 +118,14 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .view{display:none;padding:12px 16px 0}
 .view.active{display:block;animation:fade .35s ease}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* 主视图「定位当前位置」快捷卡（让自动定位一眼可见，不再藏在设置里） */
+.locate-card{display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:14px;background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:var(--r-card);box-shadow:var(--shadow-card);cursor:pointer;transition:transform .15s ease,box-shadow .2s ease;user-select:none}
+.locate-card:active{transform:scale(.98);box-shadow:var(--shadow-hc)}
+.locate-card .lc-icon{font-size:26px;line-height:1;flex:0 0 auto;width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:rgba(88,86,214,.12);border-radius:50%}
+.locate-card .lc-body{flex:1;min-width:0}
+.locate-card .lc-title{font-size:15px;font-weight:600;color:var(--label);letter-spacing:-.1px}
+.locate-card .lc-sub{font-size:12px;color:var(--secondaryLabel);margin-top:2px;line-height:1.4}
+.locate-card .lc-chev{width:16px;height:16px;color:var(--secondaryLabel);flex:0 0 auto;opacity:.7}
 /* 通用卡片：毛玻璃 + Apple 长柔光阴影 + 真实超椭圆 */
 .card,.hc,.ci,.sv,.res,.conf-box,.ltab,.vw-bar{
   background:var(--glass-strong);
@@ -329,6 +337,15 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
       </div>
     </div>
 
+    <div class="locate-card" id="locateCard" role="button" tabindex="0">
+      <div class="lc-icon">📍</div>
+      <div class="lc-body">
+        <div class="lc-title">定位到当前位置</div>
+        <div class="lc-sub" id="locateCardSub">使用浏览器 GPS 获取当前坐标并加载预报</div>
+      </div>
+      <svg class="lc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
     <div class="card">
       <h3>未来 24 小时气温 <span class="tag" id="tempSrc">综合</span></h3>
       <div class="chart-wrap" id="tempChart"></div>
@@ -532,7 +549,7 @@ const MODELS=[
   {req:"icon_seamless",key:"icon",name:"ICON",org:"德国 DWD",country:"德国",prior:.10,color:"#32ade6"},
   {req:"kma_seamless",key:"kma",name:"KMA",org:"韩国气象厅",country:"韩国",prior:.13,color:"#ff9500"},
   {req:"ukmo_seamless",key:"ukmo",name:"UKMO",org:"英国气象局",country:"英国",prior:.09,color:"#ff3b30"},
-  {req:"jma_msm",key:"jma",name:"JMA MSM",org:"日本气象厅",country:"日本",prior:.14,color:"#34c759"},
+  {req:"jma_gsm",key:"jma",name:"JMA GSM",org:"日本气象厅",country:"日本",prior:.14,color:"#34c759"},
   {req:"gfs_seamless",key:"gfs",name:"GFS",org:"美国 NCEP",country:"美国",prior:.07,color:"#8e8e93"}
 ];
 /* 国内源（仅当用户填了密钥才实时接入，否则不在综合里） */
@@ -897,8 +914,10 @@ function lineChart(opts){
     grid+='<line class="grid-line" x1="'+L+'" y1="'+yr.toFixed(1)+'" x2="'+(W-R)+'" y2="'+yr.toFixed(1)+'"/>';
     grid+='<text class="axis-label" x="'+(L-6)+'" y="'+(yr+3.5).toFixed(1)+'" text-anchor="end">'+v+'</text>';
   });
-  /* 单位：左上角小标签（远离数据线，不与纵轴重叠） */
-  grid+='<text class="axis-label unit-label" x="'+(L+2)+'" y="'+(T-6).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
+  /* 单位：左上角玻璃药丸（远离纵轴与数据线，永不重叠） */
+  const uw=opts.yunit.length*7+10,uh=16;
+  grid+='<rect x="'+(L-2)+'" y="'+(T+2)+'" width="'+uw+'" height="'+uh+'" rx="5" fill="rgba(255,255,255,.78)" stroke="rgba(0,0,0,.06)" stroke-width=".5"/>';
+  grid+='<text class="axis-label unit-label" x="'+(L+3)+'" y="'+(T+13).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
   /* x 轴：均匀 6 个标签 */
   let xl="";
   const xstep=Math.max(1,Math.floor(n/6));
@@ -950,8 +969,10 @@ function barChart(opts){
     grid+='<line class="grid-line" x1="'+L+'" y1="'+yr.toFixed(1)+'" x2="'+(W-R)+'" y2="'+yr.toFixed(1)+'"/>';
     grid+='<text class="axis-label" x="'+(L-6)+'" y="'+(yr+3.5).toFixed(1)+'" text-anchor="end">'+v+'</text>';
   });
-  /* 单位：左上角小标签（远离数据线，不与纵轴重叠） */
-  grid+='<text class="axis-label unit-label" x="'+(L+2)+'" y="'+(T-6).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
+  /* 单位：左上角玻璃药丸（远离纵轴与数据线，永不重叠） */
+  const uw=opts.yunit.length*7+10,uh=16;
+  grid+='<rect x="'+(L-2)+'" y="'+(T+2)+'" width="'+uw+'" height="'+uh+'" rx="5" fill="rgba(255,255,255,.78)" stroke="rgba(0,0,0,.06)" stroke-width=".5"/>';
+  grid+='<text class="axis-label unit-label" x="'+(L+3)+'" y="'+(T+13).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
   let bars="",xl="";
   const xstep=Math.max(1,Math.floor(n/6));
   const gid=opts.gradient?("bg"+Math.random().toString(36).slice(2,8)):null;
@@ -1495,6 +1516,7 @@ function setupNav(){
 /* ---------- backup sheet ---------- */
 function setupSheet(){
   $("#btnBackup").onclick=()=>{$("#qkey").value=ST.qkey||"";$("#ckey").value=ST.ckey||"";$("#sxkey").value=ST.sxkey||"";$("#scrim").classList.add("on");$("#sheet").classList.add("on");};
+  const lc=$("#locateCard");if(lc){lc.onclick=locateMe;lc.onkeydown=e=>{if(e.key==="Enter"||e.key===" ")locateMe();};}
   $("#closeSheet").onclick=closeSheet;
   $("#scrim").onclick=closeSheet;
   $("#saveKey").onclick=()=>{ST.qkey=$("#qkey").value.trim();ST.ckey=$("#ckey").value.trim();ST.sxkey=$("#sxkey").value.trim();save();closeSheet();toast("密钥已保存，刷新生效");};

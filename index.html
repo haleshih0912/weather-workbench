@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>天气台</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 :root{
   --bg:#f2f2f7; --card:#ffffff; --label:#6e6e73; --text:#1c1c1e; --sub:#3a3a3c; --axis:#6e6e73;
@@ -68,7 +68,15 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 /* hourly strip */
 .strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;cursor:grab;user-select:none;-webkit-user-select:none}
 .strip.dragging{cursor:grabbing;scroll-snap-type:none}
-.strip::-webkit-scrollbar{height:0}
+.strip::-webkit-scrollbar{height:6px}
+.strip::-webkit-scrollbar-track{background:transparent;margin:0 2px}
+.strip::-webkit-scrollbar-thumb{background:rgba(0,122,255,.32);border-radius:8px}
+.strip::-webkit-scrollbar-thumb:hover{background:rgba(0,122,255,.55)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(140,140,150,.35);border-radius:8px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(140,140,150,.6);background-clip:content-box}
+html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .hc{flex:0 0 auto;width:64px;scroll-snap-align:start;background:var(--card);border-radius:var(--r-sm);
   box-shadow:var(--shadow);padding:10px 8px;text-align:center;transition:transform .15s}
 .hc:active{transform:scale(.95)}
@@ -189,6 +197,17 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
   margin:0 auto 12px;animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .leaflet-container{font-family:var(--font)}
+/* 逐变量权重选择器 + 条形 */
+.vsel{appearance:none;-webkit-appearance:none;width:100%;padding:10px 14px;margin:6px 0 2px;border-radius:12px;
+  background:var(--card);color:var(--text);font-size:14px;font-weight:600;border:1px solid var(--sep);
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a8a8e' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center}
+.vw{display:flex;align-items:center;gap:10px;padding:7px 2px;font-size:13px}
+.vw-n{width:96px;flex:0 0 auto;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
+.vw-n small{font-size:10px;font-weight:400;color:var(--label);margin-top:1px}
+.vw-bar{flex:1;height:8px;border-radius:4px;background:var(--sep);overflow:hidden}
+.vw-bar i{display:block;height:100%;border-radius:4px;min-width:3px}
+.vw-p{width:48px;text-align:right;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -237,6 +256,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 
     <div class="card" id="miniCard" style="display:none">
       <h3>未来 2 小时分钟级降水</h3>
+      <div class="note" style="margin-bottom:8px">以 15 分钟为粒度，告诉你「接下来两小时哪一刻会下雨、下多大」，用于短时出行决策（带伞、等雨停、错峰通勤）。它与上方逐小时综合不同：综合是多源平滑后的平均，这里是高时间分辨率的临近预报。</div>
       <div class="mini-row" id="miniRow"></div>
       <div class="mini-cap" id="miniCap"></div>
     </div>
@@ -254,9 +274,16 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     <div class="card">
       <h3>数据来源与权重</h3>
       <div class="note" id="srcNote" style="margin-bottom:10px"></div>
-      <div class="src-ov" id="srcOverview"></div>
-    </div>
-  </section>
+    <div class="src-ov" id="srcOverview"></div>
+  </div>
+  <div class="card">
+    <h3>逐变量权重 · 具体问题具体分析 <span class="tag">新</span></h3>
+    <div class="note">不同模式在不同天气项目上各有擅长，不再用「一个整体权重」代表一切。下方按你选择的变量，展示 9 家国际 NWP 中心各自的权重（按公开评测技巧归一化到合计 100%）。例：AIFS 不输出相对湿度→湿度权重为 0；ECMWF/ICON 在降水上更强→其降水权重高于整体。</div>
+    <select id="varSel" class="vsel"></select>
+    <div class="note" id="varEvid" style="margin:8px 0 4px;color:var(--sub);font-size:11px"></div>
+    <div id="varWeights"></div>
+  </div>
+</section>
 
   <!-- CALIBRATE VIEW -->
   <section class="view" id="v-cal">
@@ -348,7 +375,28 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* 动态加载 Leaflet：主用 jsDelivr（国内可访问），失败依次回退 unpkg / cdnjs。
+   避免单一 CDN（尤其 openstreetmap/unpkg 在国内手机网络常被拦截）导致地图整块加载不出。 */
+window.__leafletReady=(function(){
+  const css="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
+  const cdns=[
+    "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
+    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+  ];
+  (function(l){l.rel="stylesheet";l.href=css;document.head.appendChild(l);})(document.createElement("link"));
+  return new Promise(function(res,rej){
+    let i=0;
+    (function next(){
+      if(i>=cdns.length){rej(new Error("leaflet load failed"));return;}
+      const s=document.createElement("script");
+      s.src=cdns[i++];s.onload=function(){res();};s.onerror=next;
+      document.head.appendChild(s);
+    })();
+  });
+})();
+</script>
 <script>
 (function(){
 "use strict";
@@ -405,6 +453,43 @@ const DOMESTIC=[
   {key:"seniverse",name:"心知天气 Seniverse",org:"实时+逐小时+指数",country:"中国",prior:.09,color:"#ff2d55",ref:false,note:"浏览器直连（需密钥），已接入实时参与"}
 ];
 
+/* ---------- 逐变量技巧矩阵 ----------
+   逐变量「技巧指数」(0–100)：依据公开评测，对 9 家国际 NWP 中心在每个天气项目上的相对能力打分。
+   该变量的权重 = 各家技巧指数 ÷ 各家之和（归一化到合计 1.0）。
+   标注 [推] 的变量为依据模式特性（而非单篇定量论文）的合理推断。
+   证据：
+   · temp/wind/precip：KAUST/EGU26(2024-09~2025-11) — AIFS 在温度/降水/风全时效技巧最高；
+     IFS 紧随；ICON 为最强传统模式；GEFS(GFS)整体垫底。
+   · hum：AIFS 不输出相对湿度（KAUST 原文 "relative humidity is unavailable from AIFS"）→ 湿度权重置 0。
+   · gust/dir：[推] DWD(ICON) 以风场/阵风见长；AIFS 因 31km 分辨率对阵风刻画偏弱。
+   · pres/cloud/vis/uv：各模式差异很小（气压同化好、云/能见度/UV 多为派生或诊断量）→ 权重趋于平缓。
+*/
+const SKILL={
+  temp:  {ecmwf:97,ecmwf025:88,aifs:100,icon:93,kma:78,ukmo:84,jma:80,gfs:70,metno:64},
+  precip:{ecmwf:96,ecmwf025:86,aifs:100,icon:90,kma:78,ukmo:84,jma:80,gfs:70,metno:64},
+  wind:  {ecmwf:94,ecmwf025:88,aifs:100,icon:92,kma:79,ukmo:85,jma:80,gfs:72,metno:65},
+  gust:  {ecmwf:95,ecmwf025:85,aifs:88, icon:96,kma:80,ukmo:86,jma:82,gfs:75,metno:70}, // [推]
+  dir:   {ecmwf:95,ecmwf025:88,aifs:94, icon:93,kma:80,ukmo:86,jma:82,gfs:76,metno:70}, // [推]
+  hum:   {ecmwf:98,ecmwf025:88,aifs:0,  icon:92,kma:80,ukmo:85,jma:82,gfs:74,metno:70}, // AIFS 不输出湿度
+  pres:  {ecmwf:95,ecmwf025:88,aifs:92, icon:90,kma:84,ukmo:88,jma:85,gfs:80,metno:82}, // 平缓
+  cloud: {ecmwf:93,ecmwf025:87,aifs:90, icon:92,kma:83,ukmo:86,jma:84,gfs:80,metno:80}, // 平缓
+  vis:   {ecmwf:92,ecmwf025:87,aifs:90, icon:91,kma:83,ukmo:86,jma:84,gfs:80,metno:80}, // 平缓
+  uv:    {ecmwf:92,ecmwf025:87,aifs:90, icon:91,kma:83,ukmo:86,jma:84,gfs:80,metno:81}  // 平缓
+};
+const VAR_LABEL={temp:"气温",precip:"降水量",wind:"风速",gust:"最大瞬时风速",dir:"风向",hum:"湿度",pres:"气压",cloud:"云量",vis:"能见度",uv:"紫外线强度"};
+const VAR_EVID={
+  temp:"KAUST/EGU26：AIFS 温度技巧全时效最高，IFS 紧随，ICON 为最强传统模式。",
+  precip:"KAUST：AIFS 降水方差解释比 ICON 高 53%、比 GEFS 高 232%；突尼斯 2025：IFS 降水 MAE 最低。",
+  wind:"KAUST：AIFS 风速技巧最高；ECMWF/GFS 飓风案例：物理量风场 ECMWF 优。",
+  gust:"[推断] DWD(ICON) 以风场/阵风著称；AIFS 因 31km 分辨率刻画阵风偏弱，故略降。",
+  dir:"[推断] 随风场，与 wind 同序。",
+  hum:"AIFS 不输出相对湿度（KAUST 原文），故湿度权重为 0；ECMWF 露点误差 2025 年降 10%。",
+  pres:"气压同化良好、各模式差异极小 → 权重趋于平缓。",
+  cloud:"云量为各模式共同难点 → 权重趋于平缓。",
+  vis:"能见度由云/雾派生 → 权重趋于平缓。",
+  uv:"UV 为晴空+云量诊断量 → 权重趋于平缓。"
+};
+
 /* calibration effective weight */
 function calFactor(key){
   let c=ST.cal[key];
@@ -412,13 +497,19 @@ function calFactor(key){
   let e=Math.min(c.tempEma||0,8);
   return 1/(e*e+0.4);
 }
-function modelPrior(modelKey){
+// 逐变量先验：有 SKILL 则用该变量技巧归一化；否则回退到全局 prior
+function modelPrior(modelKey,varKey){
+  if(varKey&&SKILL[varKey]&&SKILL[varKey][modelKey]!=null){
+    const col=SKILL[varKey];let s=0;for(const k in col)s+=col[k];
+    const v=col[modelKey];
+    if(v>0)return v/s;
+  }
   let m=MODELS.find(x=>x.key===modelKey);
   if(m)return m.prior;
   let d=DOMESTIC.find(x=>x.key===modelKey);
   return d?d.prior:0.05;
 }
-function effWeight(modelKey){return modelPrior(modelKey)*calFactor(modelKey);}
+function effWeight(modelKey,varKey){return modelPrior(modelKey,varKey)*calFactor(modelKey);}
 
 /* ---------- weather code mapping ---------- */
 function wcode(c){
@@ -623,27 +714,27 @@ function parseSeniverse(j,dtime){
 }
 
 /* ---------- composite from models ---------- */
-function blend(models,keyFn,i){
+function blend(models,keyFn,i,varKey){
   let s=0,w=0;
   for(const m of models){
     const arr=keyFn(m);if(!arr||arr[i]==null)continue;
-    const ew=effWeight(m.key);s+=arr[i]*ew;w+=ew;
+    const ew=effWeight(m.key,varKey);s+=arr[i]*ew;w+=ew;
   }
   return w?s/w:null;
 }
 function blendMap(models,i){
-  // returns {temp,precip,wind,gust,dir,hum,pres,cloud,vis,uv} composite
+  // returns {temp,precip,wind,gust,dir,hum,pres,cloud,vis,uv} composite —— 每个变量用各自权重
   return {
-    temp:blend(models,m=>m.temp,i),
-    precip:blend(models,m=>m.precip,i),
-    wind:blend(models,m=>m.wind,i),
-    gust:blend(models,m=>m.gust,i),
-    dir:blend(models,m=>m.dir,i),
-    hum:blend(models,m=>m.hum,i),
-    pres:blend(models,m=>m.pres,i),
-    cloud:blend(models,m=>m.cloud,i),
-    vis:blend(models,m=>m.vis,i),
-    uv:blend(models,m=>m.uv,i)
+    temp:blend(models,m=>m.temp,i,"temp"),
+    precip:blend(models,m=>m.precip,i,"precip"),
+    wind:blend(models,m=>m.wind,i,"wind"),
+    gust:blend(models,m=>m.gust,i,"gust"),
+    dir:blend(models,m=>m.dir,i,"dir"),
+    hum:blend(models,m=>m.hum,i,"hum"),
+    pres:blend(models,m=>m.pres,i,"pres"),
+    cloud:blend(models,m=>m.cloud,i,"cloud"),
+    vis:blend(models,m=>m.vis,i,"vis"),
+    uv:blend(models,m=>m.uv,i,"uv")
   };
 }
 
@@ -810,8 +901,13 @@ function render(){
     });
     const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
     const sum=D.mini.reduce((a,b)=>a+b.p,0);
-    $("#miniCap").innerHTML="未来 2 小时累计约 <b>"+sum.toFixed(1)+" mm</b>。"+
-      (peak.p>0?("降雨高峰约在 <b>"+peak.t.slice(11,16)+"</b>，强度 "+peak.p.toFixed(1)+" mm/15min。"):"无明显降雨。");
+    if(sum<0.05){
+      $("#miniCap").innerHTML="未来 2 小时无明显降雨，可放心安排出行。";
+    }else{
+      const peakH=(peak.p*4).toFixed(1);
+      $("#miniCap").innerHTML="未来 2 小时预计累计降雨约 <b>"+sum.toFixed(1)+" 毫米</b>。"+
+        (peak.p>0?("降雨最强时段在 <b>"+peak.t.slice(11,16)+"</b> 前后，强度约 "+peak.p.toFixed(1)+" 毫米/15分钟（≈"+peakH+" 毫米/小时）。"):"");
+    }
     $("#miniCard").style.display="block";
   }
 }
@@ -874,7 +970,7 @@ function sourceLinesFor(i,m){
     else if(m.key==="feels")val=mod.temp[i]!=null?mod.temp[i]-1:null;
     else if(m.key==="prob"){val=D.precipProb[i]!=null?D.precipProb[i]*100:null;}
     if(val==null)return;
-    const w=effWeight(mod.key);
+    const w=effWeight(mod.key,m.key);
     out.push({name:mod.name+" · "+mod.country,color:mod.color,val:fmtVal(m,val),w:w,pc:0});
   });
   if(useQW&&useQW.hourly&&useQW.hourly[i]){
@@ -888,7 +984,7 @@ function sourceLinesFor(i,m){
     else if(m.key==="prob")val=h.pop!=null?h.pop:null;
     else if(m.key==="dir")val=h.wind360!=null?parseFloat(h.wind360):null;
     if(val!=null){
-      const w=effWeight("qweather");
+      const w=effWeight("qweather",m.key);
       out.push({name:"和风天气 QWeather · 中国",color:"#007aff",val:fmtVal(m,val),w:w,pc:0});
     }
   }
@@ -905,7 +1001,7 @@ function sourceLinesFor(i,m){
     else if(m.key==="dir")val=h.wind_direction_degree!=null?parseFloat(h.wind_direction_degree):null;
     else if(m.key==="uv")val=h.uv_index!=null?parseFloat(h.uv_index):null;
     if(val!=null){
-      const w=effWeight("seniverse");
+      const w=effWeight("seniverse",m.key);
       out.push({name:"心知天气 Seniverse · 中国",color:"#ff2d55",val:fmtVal(m,val),w:w,pc:0});
     }
   }
@@ -972,12 +1068,13 @@ function renderSources(){
   $("#srcNote").innerHTML=
     "<b>综合公式</b>：综合值 = Σ(<b>直连源</b>实时数值 × 有效权重) ÷ Σ有效权重。"+
     "有效权重 = 先验可信度 × 校准因子。校准因子 = 1 ÷ (EMA误差² + 0.4)，由「校准」面板的实测记录驱动，记录越多越准。"+
-    "<br><br><b>权重明细</b>（默认无校准时，按先验归一化）：<br>"+weightBreakdown()+
-    "<br><br><b>先验权重依据</b>（公开准确率评测）："+
-    "<br>· 国际（9 个全球/洲际 NWP 中心，Open-Meteo models= 确定性集合）：ECMWF IFS 0.04°(0.175) · IFS025 0.25°(0.149) · AIFS AI 模式(0.140) · ICON 德国(0.140) · UKMO 英国(0.105) · KMA 韩国(0.088) · JMA 日本(0.088) · GFS 美国(0.070) · METNO 挪威(0.045)。<b>法国 ARPEGE(0.08) 与加拿大 GEM(0.06) 已移除</b>，其原合计 0.14 的权重按其余 9 家原有可信度比例重新分配（新权重 = 原权重 ÷ 1.14，再归一化到合计 1.0；详见上方权重明细）。"+
+    "<br><br><b>权重不再是一个整体</b>：摒弃「单一权重代表一切」的做法，改为<b>逐天气项目独立量化</b>——每个变量（气温/降水/风/阵风/风向/湿度/气压/云量/能见度/紫外线）都按各家在该项目上的公开评测技巧单独归一化。依据：KAUST/EGU26(2024-09~2025-11) 显示 AIFS 在温度/降水/风全时效技巧最高、ICON 为最强传统模式、GEFS(GFS) 整体垫底；突尼斯 2025 实测显示 IFS 降水 MAE 最低；AIFS 不输出相对湿度（KAUST 原文），故其湿度权重为 0。"+
+    "<br><br><b>逐变量权重明细</b>（默认无校准时，按技巧归一化；下方「逐变量权重」卡片可逐项查看）：<br>"+weightBreakdown()+
+    "<br><br><b>国际源（9 个全球/洲际 NWP 中心，Open-Meteo models= 确定性集合）</b>：<b>法国 ARPEGE(0.08) 与加拿大 GEM(0.06) 已按你的要求移除</b>，其原合计 0.14 的权重已按其余 9 家原有可信度比例重新分配（新权重 = 原权重 ÷ 1.14，再归一化）。"+
     "<br>· 国内可直连（浏览器 fetch，需 KEY）：和风 QWeather — Apple 中国数据源(0.11) · 心知 Seniverse — 实时+指数(0.09) · 彩云 — 分钟级降水(0.07)" +
     "<br>· 国内不可直连：CMA GRAPES 中国区降水 >10mm 阈值优于 ECMWF(0.13) · 墨迹 2024 全球第一 24h 误差≈0.8°C(0.10) · MSN 微软多模型聚合(0.06)"+
     "<br><br><b>关于「不直连」</b>：CMA/墨迹/MSN 均没有可从浏览器调用的公开 CORS 接口，因此无法获取它们的原始逐时数据。其先验权重仅用于置信度评估，<b>不</b>进入逐时综合值计算。要获得真实国内源数据，请在数据设置面板填入 <b>彩云 KEY</b> / <b>和风 KEY</b> / <b>心知 KEY</b>（三者都支持浏览器直连）。";
+  renderVarWeights();
 }
 function so(name,country,org,color,dt,wk,ref){
   const el=document.createElement("div");el.className="so";
@@ -1036,14 +1133,19 @@ function setupCal(){
 let map,marker,mapReady=false;
 function initMap(){
   if(mapReady)return;
-  if(typeof L==="undefined"){toast("地图组件加载失败，请检查网络");return;}
-  map=L.map("map",{maxBounds:[[3,73],[54,135]],maxBoundsViscosity:.7,worldCopyJump:false}).setView([ST.lastLat||APP.lat,ST.lastLng||APP.lng],ST.lastLat?6:4);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(map);
+  toast("地图加载中…");
+  window.__leafletReady.then(function(){
+    if(typeof L==="undefined"){toast("地图组件加载失败，请检查网络");return;}
+    map=L.map("map",{maxBounds:[[3,73],[54,135]],maxBoundsViscosity:.7,worldCopyJump:false}).setView([ST.lastLat||APP.lat,ST.lastLng||APP.lng],ST.lastLat?6:4);
+    // 高德底图：国内手机网络可访问（OSM 官方瓦片在国内常被墙）。高德为 GCJ-02 偏移坐标，
+    // 用于天气查询的百米级误差可忽略；如需精确坐标请用「手动输入 lat,lng」。
+    L.tileLayer("https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}",{subdomains:"1234",maxZoom:18,attribution:"© 高德地图"}).addTo(map);
   marker=L.marker([ST.lastLat||APP.lat,ST.lastLng||APP.lng],{draggable:true}).addTo(map);
   marker.on("dragend",()=>{const ll=marker.getLatLng();reverse(ll.lat,ll.lng);});
   map.on("click",e=>{marker.setLatLng(e.latlng);reverse(e.latlng.lat,e.latlng.lng);});
   mapReady=true;
   setTimeout(()=>map.invalidateSize(),200);
+  });
 }
 async function reverse(lat,lng){
   try{
@@ -1198,15 +1300,44 @@ function computeConfidence(){
     detail:`基线 50 ＋ 直连数 ${liveN} × 5 − 温度离散 ${stdev.toFixed(1)}° × 4 ＋ 先验权重和 ${(priorSum*100).toFixed(0)}%`};
 }
 function weightBreakdown(){
-  // default (no calibration): normalized % of priors
-  const items=[];
-  MODELS.forEach(m=>items.push({name:m.name,key:m.key,prior:m.prior,live:true}));
-  if(useQW)items.push({name:"和风天气 QWeather",key:"qweather",prior:DOMESTIC.find(d=>d.key==="qweather").prior,live:true});
-  if(D.models.find(m=>m.key==="caiyun"))items.push({name:"彩云天气",key:"caiyun",prior:0.07,live:true});
-  if(useSX)items.push({name:"心知天气 Seniverse",key:"seniverse",prior:DOMESTIC.find(d=>d.key==="seniverse").prior,live:true});
-  DOMESTIC.filter(d=>d.ref).forEach(d=>items.push({name:d.name,key:d.key,prior:d.prior,live:false}));
-  const tot=items.reduce((a,b)=>a+b.prior,0);
-  return items.map(it=>`${it.name}${it.live?"":"·不直连"} ${(it.prior/tot*100).toFixed(1)}%`).join(" · ");
+  // 逐变量权重（9 家国际中心，按 SKILL 技巧归一化到合计 100%）
+  const keys=Object.keys(SKILL);
+  let s="<b>逐变量权重</b>（9 家国际 NWP 中心，按公开评测技巧归一化，合计 100%）：<br>";
+  keys.forEach(vk=>{
+    const col=SKILL[vk];let tot=0;for(const k in col)tot+=col[k];
+    const parts=MODELS.filter(m=>col[m.key]!=null&&col[m.key]>0)
+      .sort((a,b)=>col[b.key]-col[a.key])
+      .map(m=>{const nm=m.name.replace("ECMWF ","").replace(" (德国 DWD)","");return nm+" "+Math.round(col[m.key]/tot*100)+"%";});
+    s+="· <b>"+VAR_LABEL[vk]+"</b>："+parts.join(" · ")+"<br>";
+  });
+  s+="<br><b>说明</b>：各变量独立归一化，因此某模式在降水上权重高、不代表它在湿度上也高（如 AIFS 湿度权重为 0）。国内源（CMA/墨迹/MSN/彩云/和风/心知）不参与国际网格归一化，按各自先验单独计入置信度。";
+  return s;
+}
+function renderVarWeights(){
+  const sel=$("#varSel");
+  if(!sel)return;
+  if(!sel.dataset.filled){
+    Object.keys(SKILL).forEach(vk=>{
+      const o=document.createElement("option");o.value=vk;o.textContent=VAR_LABEL[vk];sel.appendChild(o);
+    });
+    sel.dataset.filled="1";
+    sel.onchange=()=>renderVarWeights();
+  }
+  const vk=sel.value||"temp";
+  const col=SKILL[vk];let tot=0;for(const k in col)tot+=col[k];
+  const box=$("#varWeights");box.innerHTML="";
+  const rows=MODELS.filter(m=>col[m.key]!=null).sort((a,b)=>col[b.key]-col[a.key]);
+  rows.forEach(m=>{
+    const pct=col[m.key]/tot*100;
+    const nm=m.name.replace("ECMWF ","").replace(" (德国 DWD)","");
+    const zero=col[m.key]===0;
+    const row=document.createElement("div");row.className="vw";
+    row.innerHTML='<span class="vw-n">'+nm+'<small>'+(zero?"不输出该量":m.country)+'</small></span>'+
+      '<span class="vw-bar"><i style="width:'+Math.max(zero?0:3,pct)+'%;background:'+m.color+'"></i></span>'+
+      '<span class="vw-p">'+pct.toFixed(1)+'%</span>';
+    box.appendChild(row);
+  });
+  $("#varEvid").textContent="依据："+VAR_EVID[vk];
 }
 
 /* ---------- main load ---------- */

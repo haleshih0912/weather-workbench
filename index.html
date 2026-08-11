@@ -4,10 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>天气台</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<!-- Leaflet CSS：异步加载，绝不作为首屏阻塞资源（jsDelivr 在国内偶发不可达） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"></noscript>
 <style>
 /* ───── design tokens（HIG-aligned: 3 档文字 + 3 档背景 + 1 档分隔） ───── */
 :root{
@@ -41,8 +40,8 @@
   --r-ctl:12px;
   --r-pill:999px;
   /* 字号表（HIG：SF Pro Display ≥20px，SF Pro Text <20px，所有数字 tabular-nums 强制等宽对齐） */
-  --font:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  --font-num:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC",ui-monospace,Menlo,Consolas,monospace;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --font-num:"SF Mono",ui-monospace,"SF Pro Display",-apple-system,BlinkMacSystemFont,"PingFang SC",Menlo,Consolas,monospace;
   --t-title:34px;
   --t-hero:96px;
   --t-h1:22px;
@@ -101,7 +100,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 
 /* ───── hero ───── */
 #hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:28px 22px 24px;border-radius:var(--r-hero);box-shadow:var(--shadow-hero);transition:background .6s ease;backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);min-height:180px}
-#hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28));border-radius:inherit}
+#hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.18));border-radius:inherit;corner-shape:squircle}
 .hero-in{position:relative;z-index:2}
 .hero-top{display:flex;justify-content:space-between;align-items:flex-start}
 .hero-cond{font-size:20px;font-weight:500;letter-spacing:-.1px}
@@ -312,6 +311,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
       <button class="iconbtn" id="btnBackup" aria-label="设置">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
+      <button class="iconbtn" id="btnLocate" aria-label="定位当前位置" title="定位当前位置">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
       <button class="iconbtn" id="btnRefresh" aria-label="刷新">
         <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v4h-4"/></svg>
       </button>
@@ -335,15 +337,6 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
         <div class="hero-range" id="heroRange">最高 --° · 最低 --°</div>
         <div class="hero-action" id="heroAction"></div>
       </div>
-    </div>
-
-    <div class="locate-card" id="locateCard" role="button" tabindex="0">
-      <div class="lc-icon">📍</div>
-      <div class="lc-body">
-        <div class="lc-title">定位到当前位置</div>
-        <div class="lc-sub" id="locateCardSub">使用浏览器 GPS 获取当前坐标并加载预报</div>
-      </div>
-      <svg class="lc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
 
     <div class="card">
@@ -523,14 +516,19 @@ function save(){try{localStorage.setItem(LS+"state",JSON.stringify(ST));}catch(e
 /* ---------- time sync ---------- */
 let timeOffset=0;
 function now(){return new Date(Date.now()+timeOffset);}
+/* 带超时/中断的 fetch 封装：任何外部接口挂起都不会卡死首屏（默认 10s 自动 abort） */
+function fetchTO(url,opts={},ms=10000){
+  const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);
+  return fetch(url,Object.assign({signal:c.signal},opts)).finally(()=>clearTimeout(t));
+}
 async function syncTime(){
   try{
-    let r=await fetch("https://worldtimeapi.org/api/timezone/Asia/Shanghai",{cache:"no-store"});
+    let r=await fetchTO("https://worldtimeapi.org/api/timezone/Asia/Shanghai",{cache:"no-store"},6000);
     if(r.ok){let j=await r.json();let st=new Date(j.datetime).getTime();let off=st-Date.now();
       if(Math.abs(off)<600000){timeOffset=off;return "互联网";}}
   }catch(e){}
   try{
-    let r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=31.2&longitude=121.4&current=temperature_2m",{method:"HEAD",cache:"no-store"});
+    let r=await fetchTO("https://api.open-meteo.com/v1/forecast?latitude=31.2&longitude=121.4&current=temperature_2m",{method:"HEAD",cache:"no-store"},6000);
     let dh=r.headers.get("date");
     if(dh){let st=new Date(dh).getTime();timeOffset=st-Date.now();return "互联网";}
   }catch(e){}
@@ -680,7 +678,7 @@ async function fetchModels(lat,lng){
   const reqs=MODELS.map(m=>m.req).join(",");
   const vars="temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,pressure_msl,cloud_cover,visibility,uv_index";
   const url=base+"?latitude="+lat+"&longitude="+lng+"&hourly="+vars+"&models="+reqs+"&forecast_days=2&timezone=auto";
-  const r=await fetch(url);if(!r.ok)throw new Error("models");
+  const r=await fetchTO(url);if(!r.ok)throw new Error("models");
   const j=await r.json();if(j.error)throw new Error(j.reason);
   return j;
 }
@@ -719,7 +717,7 @@ async function fetchEnsemble(lat,lng){
   const base="https://ensemble-api.open-meteo.com/v1/ensemble";
   const models=["icon_seamless","gfs_seamless"].join(",");
   const url=base+"?latitude="+lat+"&longitude="+lng+"&hourly=precipitation&models="+models+"&forecast_days=2&timezone=auto";
-  const r=await fetch(url);if(!r.ok)throw new Error("ens");
+  const r=await fetchTO(url);if(!r.ok)throw new Error("ens");
   const j=await r.json();if(j.error)throw new Error(j.reason);
   return j;
 }
@@ -746,7 +744,7 @@ async function fetchForecast(lat,lng){
     "&hourly=precipitation_probability,temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,pressure_msl,cloud_cover,visibility"+
     "&daily=temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset,precipitation_probability_max"+
     "&forecast_days=2&timezone=auto";
-  const r=await fetch(url);if(!r.ok)throw new Error("fc");
+  const r=await fetchTO(url);if(!r.ok)throw new Error("fc");
   const j=await r.json();if(j.error)throw new Error(j.reason);
   return j;
 }
@@ -754,7 +752,7 @@ async function fetchForecast(lat,lng){
 async function fetchMinutely(lat,lng){
   const url="https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lng+
     "&minutely_15=precipitation,precipitation_probability&forecast_days=1&past_minutely_15=0&timezone=auto";
-  const r=await fetch(url);if(!r.ok)throw new Error("mini");
+  const r=await fetchTO(url);if(!r.ok)throw new Error("mini");
   const j=await r.json();
   return j;
 }
@@ -763,9 +761,9 @@ async function fetchQWeather(lat,lng,key){
   if(!key)return null;
   try{
     const loc=lng.toFixed(4)+","+lat.toFixed(4);
-    const nowR=await fetch("https://devapi.qweather.com/v7/weather/now?location="+loc+"&key="+key);
+    const nowR=await fetchTO("https://devapi.qweather.com/v7/weather/now?location="+loc+"&key="+key);
     const nowJ=await nowR.json();
-    const hR=await fetch("https://devapi.qweather.com/v7/weather/24h?location="+loc+"&key="+key);
+    const hR=await fetchTO("https://devapi.qweather.com/v7/weather/24h?location="+loc+"&key="+key);
     const hJ=await hR.json();
     if(nowJ.code!=="200"||hJ.code!=="200")return null;
     return {now:nowJ.now,hourly:hJ.hourly};
@@ -775,7 +773,7 @@ async function fetchCaiyun(lat,lng,key){
   if(!key)return null;
   try{
     const url="https://api.caiyunapp.com/v2.6/"+key+"/"+lng.toFixed(4)+","+lat.toFixed(4)+"/weather?dailysteps=1&hourlysteps=24&alert=false";
-    const r=await fetch(url);if(!r.ok)return null;
+    const r=await fetchTO(url);if(!r.ok)return null;
     const j=await r.json();
     if(j.status!=="ok")return null;
     return j;
@@ -802,9 +800,9 @@ async function fetchSeniverse(lat,lng,key){
   if(!key)return null;
   try{
     const loc=lng.toFixed(4)+","+lat.toFixed(4);
-    const nowR=await fetch("https://api.seniverse.com/v3/weather/now.json?key="+key+"&location="+loc+"&language=zh-Hans&unit=c");
+    const nowR=await fetchTO("https://api.seniverse.com/v3/weather/now.json?key="+key+"&location="+loc+"&language=zh-Hans&unit=c");
     const nowJ=await nowR.json();
-    const hR=await fetch("https://api.seniverse.com/v3/weather/hourly.json?key="+key+"&location="+loc+"&language=zh-Hans&unit=c&start=0&hours=24");
+    const hR=await fetchTO("https://api.seniverse.com/v3/weather/hourly.json?key="+key+"&location="+loc+"&language=zh-Hans&unit=c&start=0&hours=24");
     const hJ=await hR.json();
     if(nowJ.status!=="OK"||hJ.status!=="OK"||!hJ.results||!hJ.results[0]||!hJ.results[0].hourly)return null;
     return {now:nowJ.results[0].now,hourly:hJ.results[0].hourly};
@@ -1342,7 +1340,7 @@ function initMap(){
 }
 async function reverse(lat,lng){
   try{
-    const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18");
+    const r=await fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18");
     const j=await r.json();
     ST.mapLat=lat;ST.mapLng=lng;save();
     $("#mapAddr").textContent=j.display_name||(lat.toFixed(4)+", "+lng.toFixed(4));
@@ -1357,7 +1355,7 @@ function haversine(la1,lo1,la2,lo2){
 async function geoSearch(q){
   const res=$("#geoRes");res.innerHTML='<div style="color:var(--secondaryLabel)">搜索中…</div>';
   try{
-    const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=8&accept-language=zh-CN&q="+encodeURIComponent(q));
+    const r=await fetchTO("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=8&accept-language=zh-CN&q="+encodeURIComponent(q));
     const j=await r.json();
     if(!j.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';return;}
     const la0=APP.lat!=null?APP.lat:39.9042,lo0=APP.lng!=null?APP.lng:116.4074;
@@ -1422,6 +1420,7 @@ function locateMe(){
     {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
   );
 }
+function setLoc(lat,lng,name,sub){
   ST.lastLat=lat;ST.lastLng=lng;ST.lastName=name;ST.lastSub=sub||"";save();
   APP.lat=lat;APP.lng=lng;APP.name=name;APP.sub=sub||"";
   $("#locLName").textContent=name;
@@ -1516,6 +1515,7 @@ function setupNav(){
 /* ---------- backup sheet ---------- */
 function setupSheet(){
   $("#btnBackup").onclick=()=>{$("#qkey").value=ST.qkey||"";$("#ckey").value=ST.ckey||"";$("#sxkey").value=ST.sxkey||"";$("#scrim").classList.add("on");$("#sheet").classList.add("on");};
+  const bl=$("#btnLocate");if(bl)bl.onclick=locateMe;
   const lc=$("#locateCard");if(lc){lc.onclick=locateMe;lc.onkeydown=e=>{if(e.key==="Enter"||e.key===" ")locateMe();};}
   $("#closeSheet").onclick=closeSheet;
   $("#scrim").onclick=closeSheet;

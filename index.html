@@ -36,9 +36,9 @@
   --r-card:22px;
   --r-ctl:12px;
   --r-pill:999px;
-  /* 字号表（HIG：SF Pro Display ≥20px，SF Pro Text <20px，SF Mono 用于数字） */
-  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","SF Mono","Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  --font-num:"SF Mono","SF Pro Text",ui-monospace,Menlo,Consolas,monospace;
+  /* 字号表（HIG：SF Pro Display ≥20px，SF Pro Text <20px，所有数字 tabular-nums 强制等宽对齐） */
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --font-num:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro SC","Helvetica Neue","PingFang SC",ui-monospace,Menlo,Consolas,monospace;
   --t-title:34px;
   --t-hero:96px;
   --t-h1:22px;
@@ -96,7 +96,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .sync b{color:var(--label);font-weight:500}
 
 /* ───── hero ───── */
-#hero{position:relative;overflow:hidden;color:#fff;margin:0 12px 14px;padding:26px 20px 22px;border-radius:var(--r-card);box-shadow:var(--shadow-hero);transition:background .6s ease;backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px)}
+#hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:28px 22px 24px;border-radius:var(--r-card);box-shadow:var(--shadow-hero);transition:background .6s ease;backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);min-height:180px}
 #hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28));border-radius:inherit}
 .hero-in{position:relative;z-index:2}
 .hero-top{display:flex;justify-content:space-between;align-items:flex-start}
@@ -156,13 +156,14 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .hc .hi{width:26px;height:26px;margin:6px auto}
 .hc .hp{font-size:12px;font-weight:600;font-family:var(--font-num)}
 .hc .hr{font-size:var(--t-cap);color:var(--systemTeal);font-weight:600;font-family:var(--font-num)}
-.hc .hw{font-size:10px;color:var(--secondaryLabel);margin-top:2px;display:flex;align-items:center;justify-content:center;gap:2px;font-family:var(--font-num)}
-/* 风向文本外壳：宽度锁死、内容居中，避免一字/两字宽度不齐 */
-.wd{display:inline-flex;align-items:center;justify-content:center;gap:3px;min-width:4.2em;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
-.wd .dir{flex:0 0 auto}
-.wd .deg{flex:0 0 auto;opacity:.85}
+.hc .hw{font-size:11px;color:var(--secondaryLabel);margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-family:var(--font-num);font-weight:500}
+.hc .hw .ws{font-variant-numeric:tabular-nums}
+/* 风向文本外壳：宽度锁死、内容居中，避免一字/两字宽度不齐（仅详情页用） */
+.wd{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:5em;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.wd .dir{flex:0 0 auto;font-weight:500}
+.wd .deg{flex:0 0 auto;opacity:.75}
 .warr{display:inline-flex;vertical-align:-2px}
-.warr svg{width:11px;height:11px;color:var(--secondaryLabel)}
+.warr svg{width:12px;height:12px;color:var(--secondaryLabel)}
 
 /* ───── detail ───── */
 .metric{border-top:.5px solid var(--separator);padding:13px 0}
@@ -601,12 +602,12 @@ function wcode(c){
   };
   return m[c]||["未知","cloudy"];
 }
-/* 16 方位中文风向（保留东南风/正东风/北东北风等正式表达） */
+/* 8 方位中文风向（保留东南风/正东风等正式表达，简洁不溢出） */
 function windDirText(deg){
   if(deg==null)return "—";
-  const dirs=["北","北东北","东北","东北东","正东","东东南","东南","南东南","正南","南西南","西南","西西南","正西","西西北","西北","北西北"];
-  const idx=Math.round(((deg%360)+360)%360/22.5)%16;
-  return dirs[idx]+"风";
+  const dirs=["北","东北","东","东南","南","西南","西","西北"];
+  const idx=Math.round(((deg%360)+360)%360/45)%8;
+  return (idx%2===0?"正"+dirs[idx]:dirs[idx])+"风";
 }
 /* 风向箭头：气象惯例「风从哪来」，箭头指向风的去向（from 旋转 180°）。固定尺寸 SVG，按角度旋转，从根上消灭一字/两字宽度不齐。 */
 function windArrowSVG(deg,size){
@@ -1070,7 +1071,7 @@ function render(){
       '<div class="hi">'+iconSVG(wc2[1],26)+'</div>'+
       '<div class="hr">'+(D.precipProb[i]!=null?Math.round(D.precipProb[i]*100)+"%":"—")+'</div>'+
       '<div class="hp">'+Math.round(b.temp)+'°</div>'+
-      '<div class="hw"><span class="wd"><span class="dir">'+(b.dir!=null?windDirText(b.dir):"—")+'</span><span class="deg">'+(b.wind!=null?Math.round(b.wind)+" km/h":"")+'</span></span></div>';
+      '<div class="hw">'+(b.dir!=null?windArrowSVG(b.dir,12):"")+' <span class="ws">'+(b.wind!=null?Math.round(b.wind):"—")+'</span></div>';
     hc.onclick=()=>{selHour=k;renderDetail();$$(".hc").forEach((e,idx)=>e.classList.toggle("sel",idx===k));};
     strip.appendChild(hc);
   }

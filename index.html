@@ -26,9 +26,12 @@
   --systemTeal:#32ade6;     /* 降水冷色 */
   --systemGreen:#34c759;    /* 良好 / 顺风 */
   --systemYellow:#ffcc00;   /* 中性提示 */
-  /* glass & shadow */
+  /* glass & shadow（Apple HIG：柔光长投影 + 微弱内反光） */
   --glass:rgba(255,255,255,.72);
-  --shadow-card:0 1px 2px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);
+  --glass-strong:rgba(255,255,255,.82);
+  --shadow-card:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06),0 24px 60px rgba(0,0,0,.04);
+  --shadow-hero:0 1px 2px rgba(0,0,0,.10),0 12px 40px rgba(0,0,0,.18),0 32px 80px rgba(0,0,0,.12);
+  --shadow-hc:0 1px 1px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.05);
   /* 圆角（必须配 corner-shape: squircle 才接近 iOS 真实超椭圆） */
   --r-card:22px;
   --r-ctl:12px;
@@ -47,19 +50,26 @@
 
 /* ───── reset ───── */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:var(--secondarySystemBackground);color:var(--label);
+html,body{margin:0;padding:0;color:var(--label);
   font-family:var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   font-size:16px;line-height:1.4;font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum" 1,"ss01" 1}
+/* 整页柔光渐变（让毛玻璃有内容可"模糊"——Apple 风的彩色天气底纹） */
+body{background:
+  radial-gradient(120% 80% at 0% 0%,rgba(88,86,214,.10),transparent 55%),
+  radial-gradient(120% 80% at 100% 0%,rgba(255,149,0,.08),transparent 55%),
+  radial-gradient(140% 100% at 50% 100%,rgba(50,173,230,.08),transparent 60%),
+  linear-gradient(180deg,#fafafd 0%,#f3f3f8 100%);
+  background-attachment:fixed}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select{font-family:inherit;font-size:16px}
 
 /* ───── squircle fallback + modern（Apple 真实超椭圆） ───── */
-.sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet{
+.sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet,#hero{
   border-radius:var(--r-card);
 }
 @supports (corner-shape: squircle){
-  .sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet{
+  .sq,.card,.hc,.btn,.vsel,.field input,.ltab,.ci,.sv,.res,#map,.iconbtn,.badge,.vw-bar,.vw-bar i,.sr .bar,.sr .bar i,.loc-tabs,.seg,.seg button,.sheet,#hero{
     corner-shape:squircle;
   }
 }
@@ -69,7 +79,7 @@ input,select{font-family:inherit;font-size:16px}
 }
 
 /* ───── layout ───── */
-#app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--secondarySystemBackground);position:relative;padding-bottom:84px}
+#app{max-width:480px;margin:0 auto;min-height:100vh;background:transparent;position:relative;padding-bottom:84px}
 
 /* ───── header ───── */
 header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:saturate(180%) blur(20px);
@@ -86,7 +96,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .sync b{color:var(--label);font-weight:500}
 
 /* ───── hero ───── */
-#hero{position:relative;overflow:hidden;color:#fff;margin:0 0 14px;padding:26px 20px 22px;border-radius:var(--r-card);box-shadow:var(--shadow-card);transition:background .6s ease}
+#hero{position:relative;overflow:hidden;color:#fff;margin:0 12px 14px;padding:26px 20px 22px;border-radius:var(--r-card);box-shadow:var(--shadow-hero);transition:background .6s ease;backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px)}
 #hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28));border-radius:inherit}
 .hero-in{position:relative;z-index:2}
 .hero-top{display:flex;justify-content:space-between;align-items:flex-start}
@@ -104,7 +114,14 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .view{display:none;padding:12px 16px 0}
 .view.active{display:block;animation:fade .35s ease}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.card{background:var(--systemBackground);border-radius:var(--r-card);box-shadow:var(--shadow-card);padding:16px;margin-bottom:14px}
+/* 通用卡片：毛玻璃 + Apple 长柔光阴影 + 真实超椭圆 */
+.card,.hc,.ci,.sv,.res,.conf-box,.ltab,.vw-bar{
+  background:var(--glass-strong);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);
+  box-shadow:var(--shadow-card);
+}
+.card{background:var(--glass-strong);border-radius:var(--r-card);padding:16px;margin-bottom:14px}
 .card h3{margin:0 0 12px;font-size:var(--t-callout);font-weight:600;color:var(--secondaryLabel);letter-spacing:.4px;display:flex;align-items:center;gap:6px}
 .card h3 .tag{margin-left:auto;font-size:var(--t-cap);font-weight:600;color:var(--systemIndigo);background:rgba(88,86,214,.1);padding:2px 8px;border-radius:var(--r-pill)}
 
@@ -131,7 +148,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 ::-webkit-scrollbar-thumb{background:rgba(140,140,150,.35);border-radius:8px;border:2px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:rgba(140,140,150,.6);background-clip:content-box}
 html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
-.hc{flex:0 0 auto;width:64px;background:var(--systemBackground);border-radius:var(--r-card);box-shadow:var(--shadow-card);
+.hc{flex:0 0 auto;width:64px;background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:var(--r-card);box-shadow:var(--shadow-hc);
   padding:10px 8px;text-align:center;transition:transform .15s}
 .hc:active{transform:scale(.95)}
 .hc.sel{box-shadow:0 0 0 2px var(--systemIndigo);border-radius:var(--r-card)}
@@ -177,29 +194,28 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .so .info .nm{font-size:14px;font-weight:600}
 .so .info .dt{font-size:var(--t-cap);color:var(--secondaryLabel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .so .wk{font-size:var(--t-callout);font-weight:700;color:var(--systemIndigo);font-family:var(--font-num);flex:0 0 auto}
-.conf-box{margin-top:14px;padding:14px 16px;background:rgba(88,86,214,.08);border-radius:var(--r-card);display:flex;flex-direction:column;gap:6px}
+.conf-box{margin-top:14px;padding:14px 16px;background:rgba(88,86,214,.10);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:var(--r-card);box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:6px}
 .conf-head{font-size:var(--t-callout);color:var(--secondaryLabel);font-weight:600;display:flex;align-items:baseline;gap:8px}
 .conf-head b{color:var(--systemIndigo);font-size:22px;font-weight:700;font-family:var(--font-num);letter-spacing:-.5px}
 .conf-detail{font-size:var(--t-cap);color:var(--secondaryLabel);line-height:1.6}
 
 /* ───── location ───── */
 .loc-tabs{display:flex;gap:8px;margin-bottom:12px}
-.ltab{flex:1;padding:9px;background:var(--systemBackground);box-shadow:var(--shadow-card);
+.ltab{flex:1;padding:9px;background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);box-shadow:var(--shadow-card);
   font-size:var(--t-callout);font-weight:600;color:var(--secondaryLabel);text-align:center}
-.ltab.on{background:var(--systemIndigo);color:#fff}
+.ltab.on{background:var(--systemIndigo);color:#fff;box-shadow:var(--shadow-hero)}
 .field{display:flex;gap:8px;margin-bottom:10px}
-.field input{flex:1;padding:11px 12px;border:.5px solid var(--separator);background:var(--systemBackground);outline:none}
-.field input:focus{border-color:var(--systemIndigo)}
-.btn{padding:11px 16px;background:var(--systemIndigo);color:#fff;font-size:14px;font-weight:600;flex:0 0 auto}
-.btn.sec{background:rgba(120,120,128,.16);color:var(--label)}
+.field input{flex:1;padding:11px 12px;border:.5px solid var(--separator);background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);outline:none}
+.btn{padding:11px 16px;background:var(--systemIndigo);color:#fff;font-size:14px;font-weight:600;flex:0 0 auto;box-shadow:0 4px 14px rgba(88,86,214,.32)}
+.btn.sec{background:rgba(120,120,128,.16);color:var(--label);box-shadow:none}
 .btn:active{transform:scale(.97)}
 #map{height:300px;border-radius:var(--r-card);box-shadow:var(--shadow-card);margin:10px 0;z-index:1;background:#dfe3e6}
-.res{background:var(--systemBackground);box-shadow:var(--shadow-card);overflow:hidden;margin-bottom:10px}
+.res{background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);box-shadow:var(--shadow-card);overflow:hidden;margin-bottom:10px}
 .res div{padding:12px 14px;border-bottom:.5px solid var(--separator);font-size:14px;font-weight:500}
 .res div:last-child{border-bottom:none}
 .res div:active{background:rgba(88,86,214,.06)}
 .saved{display:flex;flex-direction:column;gap:8px}
-.sv{display:flex;align-items:center;gap:10px;background:var(--systemBackground);box-shadow:var(--shadow-card);padding:11px 14px}
+.sv{display:flex;align-items:center;gap:10px;background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);box-shadow:var(--shadow-card);padding:11px 14px}
 .sv .sn{font-size:14px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sv .sd{font-size:var(--t-cap);color:var(--secondaryLabel)}
 .sv .x{color:var(--systemRed);font-size:var(--t-callout);font-weight:600;padding:4px}
@@ -208,7 +224,7 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 
 /* ───── calibrate ───── */
 .cal-input{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.cal-input .ci{background:var(--systemBackground);box-shadow:var(--shadow-card);padding:11px 12px}
+.cal-input .ci{background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);box-shadow:var(--shadow-card);padding:11px 12px}
 .cal-input label{font-size:var(--t-cap);color:var(--secondaryLabel);font-weight:600}
 .cal-input input{width:100%;border:none;outline:none;font-size:18px;font-weight:600;margin-top:4px;background:transparent;font-family:var(--font-num)}
 .seg{display:flex;background:rgba(120,120,128,.16);padding:2px;margin-bottom:12px}
@@ -1102,7 +1118,8 @@ function renderDetail(){
   let html="";
   metrics.forEach(m=>{
     const mv=m.v==null?"—":fmtVal(m,m.v);
-    const mvHtml=(m.arrow&&m.v!=null)?('<span class="warr" style="color:var(--label)">'+windArrowSVG(m.v,16)+'</span>'+mv):mv;
+    /* 风向：用 .wd 容器（外壳等宽、方向名+度数居中），不再用箭头 */
+    const mvHtml=(m.key==="dir"&&m.v!=null)?('<span class="wd"><span class="dir">'+windDirText(m.v)+'</span><span class="deg">'+Math.round(m.v)+'°</span></span>'):mv;
     html+='<div class="metric"><div class="mh"><span class="mn">'+m.n+'</span><span class="mv">'+mvHtml+'</span></div>';
     html+='<div class="src">';
     const srcs=sourceLinesFor(i,m);
@@ -1184,7 +1201,7 @@ function fmtVal(m,v){
   if(m.key==="wind"||m.key==="gust")return Math.round(v)+" km/h";
   if(m.key==="hum"||m.key==="cloud")return Math.round(v)+"%";
   if(m.key==="pres")return Math.round(v)+" hPa";
-  if(m.key==="dir")return windDirText(v);
+  if(m.key==="dir")return v==null?"—":windDirText(v)+" "+Math.round(v)+"°";
   if(m.key==="uv")return uvText(v);
   return v;
 }

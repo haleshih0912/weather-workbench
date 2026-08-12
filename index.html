@@ -1981,6 +1981,8 @@ function renderVarWeights(){
     document.addEventListener("mousedown",_varOutside,true);
   }
   const vk=dd.dataset.v||"temp";
+  $("#varBtnTxt").textContent=VAR_LABEL[vk];
+  menu.querySelectorAll(".dd-item").forEach(it=>it.classList.toggle("on",it.dataset.v===vk));
   const col=SKILL[vk];let tot=0;for(const k in col)tot+=col[k];
   const box=$("#varWeights");box.innerHTML="";
   const rows=MODELS.filter(m=>col[m.key]!=null).sort((a,b)=>col[b.key]-col[a.key]);

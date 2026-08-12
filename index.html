@@ -91,6 +91,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .loc{font-size:17px;font-weight:600;letter-spacing:-.1px;flex:1;min-width:0;display:flex;align-items:center;gap:6px}
 .loc .lname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .loc small{display:block;font-size:var(--t-cap);font-weight:400;color:var(--secondaryLabel);margin-top:1px;letter-spacing:0}
+.loc small:empty{display:none}
 .loc .chev{flex:0 0 auto;width:14px;height:14px;opacity:.55}
 .iconbtn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(120,120,128,.12);flex:0 0 auto}
 .iconbtn:active{transform:scale(.92)}
@@ -288,6 +289,18 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 .lrow.cur{background:rgba(88,86,214,.07)}
 .lrow .x{color:var(--tertiaryLabel);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 auto}
 .lrow .x:active{background:rgba(255,59,48,.15);color:var(--systemRed)}
+
+/* ───── 内联地址簿（从顶栏底部延伸，非底部弹层） ───── */
+.addr-panel{display:grid;grid-template-rows:0fr;opacity:0;overflow:hidden;z-index:29;
+  background:var(--secondarySystemBackground);box-shadow:var(--shadow-card);
+  border-radius:0 0 var(--r-card) var(--r-card);
+  transition:grid-template-rows .35s cubic-bezier(.32,.72,0,1),opacity .28s ease}
+.addr-panel.on{grid-template-rows:1fr;opacity:1}
+.addr-panel .inner{overflow:hidden;min-height:0;padding:2px 14px max(12px,env(safe-area-inset-bottom))}
+.ap-head{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 10px;font-size:var(--t-h2);font-weight:700;color:var(--label)}
+.ap-go{font-size:var(--t-callout);font-weight:600;color:var(--systemIndigo);cursor:pointer}
+.ap-empty{padding:12px 2px 6px;color:var(--secondaryLabel);font-size:var(--t-callout)}
+.sv.cur{background:rgba(88,86,214,.07)}
 .keyrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
 .keyrow label{font-size:var(--t-callout);font-weight:600;width:64px;flex:0 0 auto}
 .keyrow input{flex:1;padding:10px 12px;border:.5px solid var(--separator);background:var(--systemBackground);outline:none}
@@ -336,6 +349,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
       </button>
     </div>
   </header>
+
+  <!-- 地址簿：点击顶栏地址后从 header 底部顺滑延伸出（非底部弹层），自动撑高，底部圆角 -->
+  <div id="addrPanel" class="addr-panel" aria-hidden="true"><div class="inner"></div></div>
 
   <!-- WEATHER VIEW -->
   <section class="view active" id="v-weather">
@@ -522,7 +538,7 @@ window.__leafletReady=(function(){
 const LS="wb_wx_";
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
-const APP={lat:31.2304,lng:121.4737,name:"上海",sub:"人民广场"};
+const APP={lat:31.2304,lng:121.4737,name:"上海",sub:"",addr:null};
 
 /* ---------- state ---------- */
 let ST={lastLat:null,lastLng:null,lastName:null,lastSub:null,saved:[],cal:{},qkey:"",ckey:"",sxkey:"",mapLat:null,mapLng:null};
@@ -1467,7 +1483,8 @@ async function reverse(lat,lng){
   try{
     const r=await fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18",null,4000);
     const j=await r.json();
-    $("#mapAddr").textContent=cnAddr(j.display_name||"")||(lat.toFixed(4)+", "+lng.toFixed(4));
+    APP.addr=j.address||APP.addr;
+    $("#mapAddr").textContent=fmtCnAddr(j)||(lat.toFixed(4)+", "+lng.toFixed(4));
   }catch(e){$("#mapAddr").textContent=lat.toFixed(4)+", "+lng.toFixed(4);}
 }
 function haversine(la1,lo1,la2,lo2){
@@ -1489,12 +1506,12 @@ async function geoSearch(q){
     j.forEach(p=>{
       const d=document.createElement("div");d.style.display="flex";d.style.alignItems="center";d.style.gap="6px";
       const km=p._d>=1?p._d.toFixed(0)+" km":Math.round(p._d*1000)+" m";
-      const name=cnName(p)||p.display_name.split(",")[0];
-      const sub=cnAddr(p.display_name);
+      const name=fmtCnAddr(p)||p.display_name.split(",")[0];
+      const sub="";
       const nm=document.createElement("span");nm.style.cssText="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";nm.textContent=name;
       const dist=document.createElement("span");dist.style.cssText="flex:0 0 auto;margin-left:8px;color:var(--systemIndigo);font-family:var(--font-num);font-weight:600;font-size:12px";dist.textContent=km;
       d.appendChild(nm);d.appendChild(dist);
-      d.onclick=()=>{setLoc(+p.lat,+p.lon,name,sub);switchView("v-weather");};
+      d.onclick=()=>{APP.addr=p.address||APP.addr;setLoc(+p.lat,+p.lon,name,sub);switchView("v-weather");};
       res.appendChild(d);
     });
   }catch(e){res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';}
@@ -1525,6 +1542,35 @@ function cnName(j){
   const ded=parts.filter((x,i)=>i===0||x!==parts[i-1]);
   return ded.join("").replace(/(上海市|北京市|天津市|重庆市|香港特别行政区|澳门特别行政区|台湾省)/g,"$1");
 }
+/* 规范中文地址：省+市+区+详细；直辖市特殊（如 上海市 同时是省与市，不再重复"市"）。
+   用于顶栏 / 搜索结果 / 地图选点 / 地址簿等所有地址显示，保证全站格式统一。 */
+function fmtCnAddr(j){
+  if(!j)return "";
+  const a=j.address||{};
+  const MUNI=["北京市","天津市","上海市","重庆市"];
+  const cut=s=>(s||"").replace(/(省|市|区|县|自治州|盟|地区)$/,"").trim();
+  const prov=cut(a.state||a.province||"");
+  const city=cut(a.city||a.town||a.village||"");
+  const dist=cut(a.county||a.district||"");
+  const sub=cut(a.suburb||a.neighbourhood||a.city_district||"");
+  const road=((a.road||a.pedestrian||"")+(a.house_number||"")).trim();
+  let head;
+  if(MUNI.some(m=>cut(m)===prov)){
+    head=prov+"市";                                   // 直辖市：上海市 本身就是 省+市
+  }else{
+    head=(prov?prov+"省":"")+(city?city+"市":"");
+  }
+  const d=dist&&head.indexOf(dist)===-1?dist:"";       // 避免区名已在 head 里重复
+  const sb=sub&&(head+d).indexOf(sub)===-1?sub:"";
+  const full=(head+d+sb+road).replace(/([省市区县])\1+/g,"$1");
+  return full||(j.display_name||"").split(",")[0].trim();
+}
+/* 从已保存项（{name,addr}）取统一格式地址：优先用存下的 Nominatim address 重新拼，
+   保证全站格式一致；老数据没有 addr 时回退到已存的 name。 */
+function dispName(s){
+  if(s&&s.addr)return fmtCnAddr({address:s.addr})||(s.name||"位置");
+  return (s&&s.name)||"位置";
+}
 
 function locateMe(btn){
   btn=btn||$("#locBtn");
@@ -1548,8 +1594,9 @@ function locateMe(btn){
       fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14",null,4000)
         .then(r=>r.json()).then(j=>{
           const dn=j.display_name||"";
-          const nm=cnName(j)||dn.split(",")[0]||"当前位置";
-          setLoc(la,ln,nm,cnAddr(dn));   // 真实地名，persist=true 落盘
+          const nm=fmtCnAddr(j)||dn.split(",")[0]||"当前位置";
+          APP.addr=j.address||APP.addr;
+          setLoc(la,ln,nm,"");   // 真实地名，persist=true 落盘（副标题留空，顶栏只显示一行规范地址）
           toast("已定位到 "+nm);
         }).catch(()=>{
           /* 反查失败：把顶栏从"定位中…"改成"当前位置"（仍不落盘），不残留占位文字 */
@@ -1613,42 +1660,69 @@ function openSwitchSheet(title, items, opts){
   scrim.classList.add("on");sheet.classList.add("on");
 }
 
-/* 已保存位置：点击弹层切换（一键选中，不用输数字）。无已保存位置时静默返回。 */
-function quickSwitch(){
-  if(!ST.saved.length){toast("还没保存过位置，先在底部「位置」里搜一下保存");switchView("v-loc");return;}
+/* 已保存位置：点击顶栏地址后，从顶栏底部顺滑延伸出地址簿（不是从屏幕底部滑入的弹层）。
+   自动撑高到刚好放满保存项，底部两个角为圆角，与其他模块一致。 */
+function renderAddrPanel(){
+  const panel=$("#addrPanel"),inner=panel.querySelector(".inner");
+  inner.innerHTML="";
+  const h=document.createElement("div");h.className="ap-head";
+  h.innerHTML='<span>已保存位置</span><span class="ap-go" id="apGo">管理</span>';
+  inner.appendChild(h);
+  h.querySelector("#apGo").onclick=()=>{toggleAddrPanel(false);switchView("v-loc");};
+  const add=document.createElement("div");add.className="sv save-cta";
+  add.innerHTML='<div style="flex:1"><div class="sn">保存当前位置</div><div class="sd">给当前点起个名字，方便一键切换</div></div>'+
+    '<div class="x" style="color:var(--systemIndigo);font-weight:700">保存</div>';
+  add.onclick=()=>{saveCurrent();renderAddrPanel();};
+  inner.appendChild(add);
+  if(!ST.saved.length){
+    const empty=document.createElement("div");empty.className="ap-empty";
+    empty.textContent="还没有保存过位置，去「位置」里搜一下保存吧";
+    inner.appendChild(empty);
+    return;
+  }
   const curName=ST.lastName||"";
   const items=ST.saved.slice();
-  /* 当前位置若不在已保存列表里，临时放到第一位（不可删除） */
   const hasCur=!!items.find(s=>s.name===curName);
-  if(curName&&!hasCur)items.unshift({name:curName,sub:APP.sub||"",lat:APP.lat,lng:APP.lng});
-  /* deletable[i]：true 表示这是已保存项，可删除；临时插入的当前位置不可删 */
-  const deletable=items.map(s=>!!ST.saved.find(x=>x.name===s.name));
-  openSwitchSheet("切换到已保存位置",items,{
-    current:curName,
-    deletable,
-    onpick:(i)=>{
-      const s=items[i];
-      setLoc(s.lat,s.lng,s.name,s.sub||"");
-      switchView("v-weather");
-      toast("已切换到 "+s.name);
-    },
-    ondel:(i)=>{
-      if(!deletable[i])return;
-      const realI=ST.saved.findIndex(x=>x.name===items[i].name);
-      if(realI<0)return;
-      const rm=ST.saved[realI];
-      ST.saved.splice(realI,1);save();renderSaved();
-      toast("已删除「"+rm.name+"」");
-      /* 重新打开弹层（保持操作连贯） */
-      quickSwitch();
-    }
+  if(curName&&!hasCur)items.unshift({name:curName,sub:"",addr:APP.addr,lat:APP.lat,lng:APP.lng,cur:true});
+  items.forEach(s=>{
+    const el=document.createElement("div");el.className="sv"+(s.cur?" cur":"");
+    const del=!s.cur;
+    el.innerHTML='<div style="flex:1"><div class="sn">'+dispName(s)+(s.cur?'<span class="ck" style="margin-left:8px">当前</span>':'')+'</div></div>'+
+      (del?'<div class="x" data-i="'+ST.saved.indexOf(s)+'">删除</div>':'');
+    el.querySelector(".sn").onclick=()=>{
+      setLoc(s.lat,s.lng,dispName(s),"");APP.addr=s.addr||APP.addr;
+      toggleAddrPanel(false);switchView("v-weather");toast("已切换到 "+dispName(s));
+    };
+    if(del){const x=el.querySelector(".x");x.onclick=(e)=>{e.stopPropagation();
+      const ri=ST.saved.indexOf(s);if(ri<0)return;
+      const rm=ST.saved[ri];ST.saved.splice(ri,1);save();renderAddrPanel();toast("已删除「"+dispName(rm)+"」");
+    };}
+    inner.appendChild(el);
   });
+}
+function toggleAddrPanel(force){
+  const panel=$("#addrPanel");
+  const open=force!==undefined?force:!panel.classList.contains("on");
+  if(open){
+    renderAddrPanel();
+    panel.classList.add("on");
+    setTimeout(()=>document.addEventListener("click",_closeAddrOnOutside,true),0);
+  }else{
+    panel.classList.remove("on");
+    document.removeEventListener("click",_closeAddrOnOutside,true);
+  }
+}
+function _closeAddrOnOutside(e){
+  const panel=$("#addrPanel");
+  if(panel.classList.contains("on")&&!panel.contains(e.target)&&!$("#locName").contains(e.target)){
+    toggleAddrPanel(false);
+  }
 }
 function saveCurrent(){
   if(!ST.lastLat){toast("还没定位到当前位置");return;}
   const name=prompt("给当前位置起个名字",ST.lastName||"当前位置");
   if(!name)return;
-  const item={name:name,sub:ST.lastSub||"",lat:ST.lastLat,lng:ST.lastLng};
+  const item={name:name,sub:"",addr:APP.addr||null,lat:ST.lastLat,lng:ST.lastLng};
   /* 去重：同名就覆盖 */
   const exist=ST.saved.findIndex(s=>s.name===name);
   if(exist>=0)ST.saved[exist]=item;else ST.saved.push(item);
@@ -1665,9 +1739,9 @@ function renderSaved(){
   if(!ST.saved.length)return;
   ST.saved.forEach((s,idx)=>{
     const el=document.createElement("div");el.className="sv";
-    el.innerHTML='<div style="flex:1"><div class="sn">'+s.name+'</div><div class="sd">'+cnAddr(s.sub)+'</div></div>'+
+    el.innerHTML='<div style="flex:1"><div class="sn">'+dispName(s)+'</div><div class="sd"></div></div>'+
       '<div class="x" data-i="'+idx+'">删除</div>';
-    el.querySelector(".sn").onclick=()=>{setLoc(s.lat,s.lng,s.name,s.sub);switchView("v-weather");toast("已切换到 "+s.name);};
+    el.querySelector(".sn").onclick=()=>{setLoc(s.lat,s.lng,dispName(s),"");APP.addr=s.addr||APP.addr;switchView("v-weather");toast("已切换到 "+dispName(s));};
     el.querySelector(".x").onclick=(e)=>{e.stopPropagation();ST.saved.splice(idx,1);save();renderSaved();};
     box.appendChild(el);
   });
@@ -1697,7 +1771,7 @@ function setupLoc(){
   $("#mapUse").onclick=()=>{
     const lat=ST.mapLat!=null?ST.mapLat:(ST.lastLat||APP.lat);
     const lng=ST.mapLng!=null?ST.mapLng:(ST.lastLng||APP.lng);
-    setLoc(lat,lng,ST.lastName||"地图选点",$("#mapAddr").textContent);switchView("v-weather");
+    setLoc(lat,lng,$("#mapAddr").textContent||"地图选点","");switchView("v-weather");
   };
 }
 
@@ -1942,9 +2016,9 @@ function boot(){
   setupNav();setupSheet();setupCal();setupLoc();
   enableDragScroll($("#strip"));
   if(ST.lastLat!=null&&ST.lastLng!=null){
-    APP.lat=ST.lastLat;APP.lng=ST.lastLng;APP.name=ST.lastName||"位置";APP.sub=ST.lastSub||"";
+    APP.lat=ST.lastLat;APP.lng=ST.lastLng;APP.name=ST.lastName||"位置";APP.sub="";APP.addr=null;
     $("#locLName").textContent=APP.name;
-    $("#locSub").textContent=APP.sub;
+    $("#locSub").textContent="";
   }else{
     if(navigator.geolocation){
       navigator.geolocation.getCurrentPosition(pos=>{
@@ -1953,11 +2027,8 @@ function boot(){
       },()=>{ },{timeout:8000});
     }
   }
-  /* header 地点点击 → 弹出快速切换（已保存位置列表） */
-  $("#locName").onclick=()=>{
-    if(!ST.saved.length){toast("还没保存过位置，先在底部「位置」里搜一下保存");switchView("v-loc");return;}
-    quickSwitch();
-  };
+  /* header 地点点击 → 从顶栏底部顺滑延伸出地址簿（不再从屏幕底部滑入弹层） */
+  $("#locName").onclick=(e)=>{e.stopPropagation();toggleAddrPanel();};
   setInterval(()=>{
     const d=now();
     $("#syncBox").innerHTML="时间 · "+syncLabel+'<br><b>'+fmtClock(d)+'</b>';
@@ -1971,8 +2042,9 @@ async function tickSync(){
 function reverseLoc(lat,lng){
   fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18",null,4000)
     .then(r=>r.json()).then(j=>{
-      const name=cnName(j)||(j.display_name?j.display_name.split(",")[0]:"我的位置");
-      setLoc(lat,lng,name,cnAddr(j.display_name||""));
+      const name=fmtCnAddr(j)||(j.display_name?j.display_name.split(",")[0]:"我的位置");
+      APP.addr=j.address||APP.addr;
+      setLoc(lat,lng,name,"");
     }).catch(()=>{$("#locLName").textContent="已定位";$("#locSub").textContent=lat.toFixed(2)+","+lng.toFixed(2);});
 }
 

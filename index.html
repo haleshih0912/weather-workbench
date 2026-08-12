@@ -1686,11 +1686,12 @@ function locateMe(btn){
       const la=+pos.coords.latitude.toFixed(4),ln=+pos.coords.longitude.toFixed(4);
       btn.classList.remove("locating");
       if(msg)msg.textContent="";
-      /* 不再把顶栏覆盖成"定位中…"——图标旋转 + toast 已足够反馈；保留用户当前看到的名字，
-         仅在解析成功后才覆盖为真实地址，避免把"公司"/"由由"等已存名字冲掉或长期显示"定位中"。 */
+      /* 立即用真实坐标刷新天气（避免在反查地址的这几秒内仍显示旧地点天气），
+         顶栏名字先保留用户当前看到的（"公司"/"由由"等），待反查成功后再覆盖为真实地址。 */
+      APP.lat=la;APP.lng=ln;APP.addr=null;ST.lastLat=la;ST.lastLng=ln;save();loadAll();
       switchView("v-weather");
       toast("已定位，正在解析地址…");
-      fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14",null,4000)
+      fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=18",null,4000)
         .then(r=>r.json()).then(j=>{
           const dn=j.display_name||"";
           const nm=fmtCnAddr(j)||dn.split(",")[0]||"当前位置";
@@ -1714,7 +1715,7 @@ function locateMe(btn){
       else msg.textContent="定位失败："+(err.message||"未知错误");}
       toast("定位失败：请点击顶部地址手动选择，或到浏览器设置中允许定位");
     },
-    {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
+    {enableHighAccuracy:true,timeout:15000,maximumAge:0}
   );
 }
 /* persist=true 才会写入 localStorage；定位过程中用 persist=false，避免把"定位中…"这种占位名
@@ -2141,7 +2142,7 @@ function boot(){
       },err=>{
         /* 首次打开且无缓存：顶栏静态为"选择位置"，失败时保持并 toast 引导用户手动选 */
         toast("自动定位失败：请点击顶部地址手动选择，或到浏览器设置中允许定位");
-      },{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+      },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
     }
   }
   /* header 地点点击 → 从顶栏底部顺滑延伸出地址簿（不再从屏幕底部滑入弹层） */

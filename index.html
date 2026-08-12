@@ -1509,6 +1509,16 @@ function geoQueries(q){
   if(!sufs.some(s=>base.endsWith(s))) sufs.forEach(s=>set.add(base+s));
   return [...set];
 }
+/* 点击搜索结果框（#locSearch）之外任意位置，折叠搜索结果 */
+function closeGeoRes(){
+  const res=$("#geoRes");
+  if(res){res.innerHTML="";res.style.maxHeight="";}
+  document.removeEventListener("mousedown",_geoOutside,true);
+}
+function _geoOutside(e){
+  if(e.target.closest("#locSearch")) return; // 点在搜索面板内不折叠
+  closeGeoRes();
+}
 async function geoSearch(q){
   const res=$("#geoRes");res.innerHTML='<div style="color:var(--secondaryLabel)">搜索中…</div>';
   try{
@@ -1546,7 +1556,12 @@ async function geoSearch(q){
       d.onclick=()=>{APP.addr=p.address||APP.addr;setLoc(+p.lat,+p.lon,name,sub);switchView("v-weather");};
       res.appendChild(d);
     });
-  }catch(e){res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';}
+    document.removeEventListener("mousedown",_geoOutside,true);
+    document.addEventListener("mousedown",_geoOutside,true);
+  }catch(e){
+    res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';
+    document.removeEventListener("mousedown",_geoOutside,true);
+  }
 }
 /* 搜索结果主名：优先用要素名（楼名/POI/路名/街道名），更贴近用户搜的词；
    否则用规范中文地址；再不行取 display_name 首段。 */
@@ -1810,6 +1825,7 @@ function setupLoc(){
     $$(".ltab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
     const which=t.dataset.t;
     $("#locSearch").style.display=which==="search"?"block":"none";
+    if(which!=="search") closeGeoRes();
     $("#locAuto").style.display=which==="auto"?"block":"none";
     $("#locManual").style.display=which==="manual"?"block":"none";
     $("#locMap").style.display=which==="map"?"block":"none";

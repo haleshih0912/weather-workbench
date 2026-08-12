@@ -135,6 +135,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .card{background:var(--glass-strong);border-radius:var(--r-card);padding:16px;margin-bottom:14px}
 .card h3{margin:0 0 12px;font-size:var(--t-callout);font-weight:600;color:var(--secondaryLabel);letter-spacing:.4px;display:flex;align-items:center;gap:6px}
 .card h3 .tag{margin-left:auto;font-size:var(--t-cap);font-weight:600;color:var(--systemIndigo);background:rgba(88,86,214,.1);padding:2px 8px;border-radius:var(--r-pill)}
+.card h3 .unit{margin-left:6px;font-size:var(--t-cap);font-weight:600;color:var(--tertiaryLabel);font-family:var(--font-num)}
 
 /* ───── charts（统一 padding 44/16/20/30） ───── */
 .chart-wrap{width:100%;overflow:hidden;position:relative}
@@ -340,17 +341,17 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     </div>
 
     <div class="card">
-      <h3>未来 24 小时气温 <span class="tag" id="tempSrc">综合</span></h3>
+      <h3>未来 24 小时气温 <span class="tag" id="tempSrc">综合</span><span class="unit" id="tempUnit">°C</span></h3>
       <div class="chart-wrap" id="tempChart"></div>
     </div>
 
     <div class="card">
-      <h3>未来 24 小时降水 <span class="tag" id="precipSrc">综合</span></h3>
+      <h3>未来 24 小时降水 <span class="tag" id="precipSrc">综合</span><span class="unit" id="precipUnit">%</span></h3>
       <div class="chart-wrap" id="precipChart"></div>
     </div>
 
     <div class="card" id="miniCard" style="display:none">
-      <h3>未来 2 小时分钟级降水</h3>
+      <h3>未来 2 小时分钟级降水<span class="unit" id="miniUnit">mm</span></h3>
       <div class="chart-wrap" id="miniChart"></div>
       <div class="mini-cap" id="miniCap"></div>
     </div>
@@ -407,7 +408,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     <div class="card">
       <div class="loc-tabs">
         <div class="ltab on" data-t="search">搜索</div>
-        <div class="ltab" data-t="auto">📍 自动定位</div>
+        <div class="ltab" data-t="auto">自动定位</div>
         <div class="ltab" data-t="manual">手动输入</div>
         <div class="ltab" data-t="map">地图</div>
       </div>
@@ -420,10 +421,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
         <div class="note">数据来自 OpenStreetMap，仅限中国范围。点选结果即定位。</div>
       </div>
       <div id="locAuto" style="display:none;text-align:center;padding:14px 0 4px">
-        <div style="font-size:48px;line-height:1;margin-bottom:10px">📍</div>
         <div style="font-size:15px;font-weight:600;margin-bottom:6px">使用浏览器定位</div>
         <div style="font-size:13px;color:var(--secondaryLabel);margin-bottom:14px;line-height:1.5">点击下方按钮，浏览器将请求 GPS 坐标并自动逆解析为地名，加载该位置的预报。</div>
-        <button class="btn" id="locBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;background:var(--systemIndigo);color:#fff">📍 获取当前位置</button>
+        <button class="btn" id="locBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;background:var(--systemIndigo);color:#fff">获取当前位置</button>
         <div id="locAutoMsg" style="margin-top:10px;font-size:12px;color:var(--secondaryLabel);min-height:16px"></div>
       </div>
       <div id="locManual" style="display:none">
@@ -672,15 +672,42 @@ function iconSVG(type,size){
   return s+'<path d="M7 14a4 4 0 0 1 .4-8 5 5 0 0 1 9.5 1.3A3.5 3.5 0 0 1 17 14H7z"/></svg>';
 }
 
-/* ---------- fetch: multi-model deterministic (the core multi-source) ---------- */
-async function fetchModels(lat,lng){
+/* ---------- fetch: multi-model deterministic (the core multi-source) ----------
+   Open-Meteo 的 models 组合请求要求同网格：KMA_seamless 与 ECMWF_AIFS025 与欧洲系
+   网格不同，一旦与其余 6 家同批请求就会被判为不可用、整列返回 null（实测上海/北京均如此）。
+   因此拆成 3 组并行拉取：① 6 家兼容组（多模型同批）；② KMA 单独；③ AIFS 单独。
+   单独请求返回的列不带 _<model> 后缀，合并时需补回后缀，parseModels 才能识别。 */
+const MODEL_VARS="temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,pressure_msl,cloud_cover,visibility,uv_index";
+const MODEL_GROUPS=[
+  {reqs:"ecmwf_ifs,ecmwf_ifs025,icon_seamless,ukmo_seamless,jma_gsm,gfs_seamless",suffix:false},
+  {reqs:"kma_seamless",suffix:true},
+  {reqs:"ecmwf_aifs025",suffix:true}
+];
+async function fetchModelsGroup(lat,lng,reqs){
   const base="https://api.open-meteo.com/v1/forecast";
-  const reqs=MODELS.map(m=>m.req).join(",");
-  const vars="temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m,pressure_msl,cloud_cover,visibility,uv_index";
-  const url=base+"?latitude="+lat+"&longitude="+lng+"&hourly="+vars+"&models="+reqs+"&forecast_days=2&timezone=auto";
+  const url=base+"?latitude="+lat+"&longitude="+lng+"&hourly="+MODEL_VARS+"&models="+reqs+"&forecast_days=2&timezone=auto";
   const r=await fetchTO(url);if(!r.ok)throw new Error("models");
   const j=await r.json();if(j.error)throw new Error(j.reason);
   return j;
+}
+async function fetchAllModels(lat,lng){
+  const results=await Promise.allSettled(MODEL_GROUPS.map(g=>fetchModelsGroup(lat,lng,g.reqs)));
+  let merged=null;
+  const baseVars=MODEL_VARS.split(",");
+  for(let gi=0;gi<results.length;gi++){
+    const res=results[gi];
+    if(res.status!=="fulfilled"||!res.value||res.value.error)continue;
+    const h=res.value.hourly;if(!h||!h.time)continue;
+    if(!merged)merged={hourly:{time:h.time}};
+    if(MODEL_GROUPS[gi].suffix){
+      const suf="_"+MODEL_GROUPS[gi].reqs; // "_kma_seamless" / "_ecmwf_aifs025"
+      baseVars.forEach(v=>{ if(v in h) merged.hourly[v+suf]=h[v]; });
+    }else{
+      for(const k in h){ if(k==="time")continue; merged.hourly[k]=h[k]; }
+    }
+  }
+  if(!merged)throw new Error("models");
+  return merged;
 }
 function parseModels(j){
   const h=j.hourly,time=h.time;
@@ -912,10 +939,6 @@ function lineChart(opts){
     grid+='<line class="grid-line" x1="'+L+'" y1="'+yr.toFixed(1)+'" x2="'+(W-R)+'" y2="'+yr.toFixed(1)+'"/>';
     grid+='<text class="axis-label" x="'+(L-6)+'" y="'+(yr+3.5).toFixed(1)+'" text-anchor="end">'+v+'</text>';
   });
-  /* 单位：左上角玻璃药丸（远离纵轴与数据线，永不重叠） */
-  const uw=opts.yunit.length*7+10,uh=16;
-  grid+='<rect x="'+(L-2)+'" y="'+(T+2)+'" width="'+uw+'" height="'+uh+'" rx="5" fill="rgba(255,255,255,.78)" stroke="rgba(0,0,0,.06)" stroke-width=".5"/>';
-  grid+='<text class="axis-label unit-label" x="'+(L+3)+'" y="'+(T+13).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
   /* x 轴：均匀 6 个标签 */
   let xl="";
   const xstep=Math.max(1,Math.floor(n/6));
@@ -967,10 +990,6 @@ function barChart(opts){
     grid+='<line class="grid-line" x1="'+L+'" y1="'+yr.toFixed(1)+'" x2="'+(W-R)+'" y2="'+yr.toFixed(1)+'"/>';
     grid+='<text class="axis-label" x="'+(L-6)+'" y="'+(yr+3.5).toFixed(1)+'" text-anchor="end">'+v+'</text>';
   });
-  /* 单位：左上角玻璃药丸（远离纵轴与数据线，永不重叠） */
-  const uw=opts.yunit.length*7+10,uh=16;
-  grid+='<rect x="'+(L-2)+'" y="'+(T+2)+'" width="'+uw+'" height="'+uh+'" rx="5" fill="rgba(255,255,255,.78)" stroke="rgba(0,0,0,.06)" stroke-width=".5"/>';
-  grid+='<text class="axis-label unit-label" x="'+(L+3)+'" y="'+(T+13).toFixed(1)+'" text-anchor="start">'+opts.yunit+'</text>';
   let bars="",xl="";
   const xstep=Math.max(1,Math.floor(n/6));
   const gid=opts.gradient?("bg"+Math.random().toString(36).slice(2,8)):null;
@@ -1080,6 +1099,7 @@ function render(){
   const pad=Math.max(2,(tmax-tmin)*0.15);
   paintLine($("#tempChart"),{values:temps,xlabels:labels,ymin:Math.floor(tmin-pad),ymax:Math.ceil(tmax+pad),gradient:["#ffcc00","#ff3b30"],yunit:"°C"});
   paintBar($("#precipChart"),{values:probs,xlabels:labels,ymax:100,color:"#32ade6",gradient:"precipBar",yunit:"%"});
+  $("#tempUnit").textContent="°C";$("#precipUnit").textContent="%";
 
   const cur=D.current;
   const wc=wcode(cur.weather_code);
@@ -1115,6 +1135,7 @@ function render(){
     const vals=D.mini.map(x=>x.p);
     const ml=D.mini.map(x=>x.t.slice(11,16));
     paintBar($("#miniChart"),{values:vals,xlabels:ml,ymax:Math.max(0.5,...vals),color:"#32ade6",gradient:"miniRain",yunit:"mm"});
+    $("#miniUnit").textContent="mm";
     const sum=D.mini.reduce((a,b)=>a+b.p,0);
     const peak=D.mini.reduce((a,b)=>b.p>a.p?b:a,{p:0});
     if(sum<0.05){
@@ -1332,17 +1353,24 @@ function initMap(){
     map=L.map("map",{maxBounds:[[3,73],[54,135]],maxBoundsViscosity:.7,worldCopyJump:false}).setView([ST.lastLat||APP.lat,ST.lastLng||APP.lng],ST.lastLat?6:4);
     L.tileLayer("https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}",{subdomains:"1234",maxZoom:18,attribution:"© 高德地图"}).addTo(map);
   marker=L.marker([ST.lastLat||APP.lat,ST.lastLng||APP.lng],{draggable:true}).addTo(map);
-  marker.on("dragend",()=>{const ll=marker.getLatLng();reverse(ll.lat,ll.lng);});
-  map.on("click",e=>{marker.setLatLng(e.latlng);reverse(e.latlng.lat,e.latlng.lng);});
+  marker.on("dragend",()=>{const ll=marker.getLatLng();pickMap(ll.lat,ll.lng);});
+  map.on("click",e=>{marker.setLatLng(e.latlng);pickMap(e.latlng.lat,e.latlng.lng);});
   mapReady=true;
   setTimeout(()=>map.invalidateSize(),200);
   });
 }
+/* 地图选点：先存坐标（无论反查成败），再反查地名，并立即刷新该点天气 */
+function pickMap(lat,lng){
+  ST.mapLat=lat;ST.mapLng=lng;save();
+  reverse(lat,lng);
+  setLoc(lat,lng,"地图选点","");
+  toast("已选点，天气已刷新");
+}
 async function reverse(lat,lng){
+  ST.mapLat=lat;ST.mapLng=lng;save();
   try{
     const r=await fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18");
     const j=await r.json();
-    ST.mapLat=lat;ST.mapLng=lng;save();
     $("#mapAddr").textContent=j.display_name||(lat.toFixed(4)+", "+lng.toFixed(4));
   }catch(e){$("#mapAddr").textContent=lat.toFixed(4)+", "+lng.toFixed(4);}
 }
@@ -1374,48 +1402,40 @@ async function geoSearch(q){
   }catch(e){res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';}
 }
 /* 自动定位：浏览器 GPS → 反查地名 → 加载预报 */
-function locateMe(){
-  const btn=$("#locBtn"),msg=$("#locAutoMsg");
+function locateMe(btn){
+  btn=btn||$("#locBtn");
+  const msg=$("#locAutoMsg");
   if(!navigator.geolocation){
-    msg.textContent="当前浏览器不支持定位 API";
-    msg.style.color="var(--systemRed)";
+    if(msg){msg.textContent="当前浏览器不支持定位 API";msg.style.color="var(--systemRed)";}
     return;
   }
-  btn.disabled=true;
   const origTxt=btn.textContent;
-  btn.textContent="定位中…";
-  msg.textContent="正在获取 GPS 坐标…";
-  msg.style.color="var(--secondaryLabel)";
+  btn.disabled=true;btn.textContent="定位中…";
+  if(msg){msg.textContent="正在获取 GPS 坐标…";msg.style.color="var(--secondaryLabel)";}
   navigator.geolocation.getCurrentPosition(
     pos=>{
       const la=+pos.coords.latitude.toFixed(4),ln=+pos.coords.longitude.toFixed(4);
-      msg.textContent="已获取坐标 "+la+", "+ln+"（精度 "+Math.round(pos.coords.accuracy||0)+" m），正在反查地址…";
-      /* 反查地名 → 加载预报 */
-      fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14")
+      btn.disabled=false;btn.textContent=origTxt;
+      if(msg)msg.textContent="";
+      /* 先立即刷新天气（用坐标占位名），反查到地名后再补名字，避免 Nominatim 卡住导致「无反应」 */
+      setLoc(la,ln,"定位中…","");
+      switchView("v-weather");
+      toast("已定位，正在解析地址…");
+      fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14")
         .then(r=>r.json()).then(j=>{
           const dn=j.display_name||"";
-          const nm=j.address&&(j.address.city||j.address.town||j.address.county||j.address.province||j.address.state)||dn.split(",")[0]||("当前位置");
+          const nm=(j.address&&(j.address.city||j.address.town||j.address.county||j.address.province||j.address.state))||dn.split(",")[0]||"当前位置";
           setLoc(la,ln,nm,dn);
-          btn.disabled=false;btn.textContent=origTxt;
-          msg.textContent="";
-          switchView("v-weather");
           toast("已定位到 "+nm);
-        }).catch(()=>{
-          /* 反查失败也用坐标定位 */
-          setLoc(la,ln,"当前位置","");
-          btn.disabled=false;btn.textContent=origTxt;
-          msg.textContent="";
-          switchView("v-weather");
-          toast("已定位到当前位置");
-        });
+        }).catch(()=>{toast("已定位到当前位置");});
     },
     err=>{
       btn.disabled=false;btn.textContent=origTxt;
-      msg.style.color="var(--systemRed)";
+      if(msg){msg.style.color="var(--systemRed)";
       if(err.code===1)msg.textContent="定位被拒绝：请在浏览器设置中允许位置权限";
       else if(err.code===2)msg.textContent="定位不可用：设备无法获取位置";
       else if(err.code===3)msg.textContent="定位超时：请到室外或信号好的位置重试";
-      else msg.textContent="定位失败："+(err.message||"未知错误");
+      else msg.textContent="定位失败："+(err.message||"未知错误");}
     },
     {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
   );
@@ -1480,7 +1500,7 @@ function setupLoc(){
     $("#locMap").style.display=which==="map"?"block":"none";
     if(which==="map")initMap();
   });
-  $("#locBtn").onclick=locateMe;
+  $("#locBtn").onclick=()=>locateMe($("#locBtn"));
   $("#geoBtn").onclick=()=>{const q=$("#geoQ").value.trim();if(q)geoSearch(q);};
   $("#geoQ").addEventListener("keydown",e=>{if(e.key==="Enter")$("#geoBtn").click();});
   $("#manUse").onclick=()=>{
@@ -1515,7 +1535,7 @@ function setupNav(){
 /* ---------- backup sheet ---------- */
 function setupSheet(){
   $("#btnBackup").onclick=()=>{$("#qkey").value=ST.qkey||"";$("#ckey").value=ST.ckey||"";$("#sxkey").value=ST.sxkey||"";$("#scrim").classList.add("on");$("#sheet").classList.add("on");};
-  const bl=$("#btnLocate");if(bl)bl.onclick=locateMe;
+  const bl=$("#btnLocate");if(bl)bl.onclick=()=>locateMe(bl);
   const lc=$("#locateCard");if(lc){lc.onclick=locateMe;lc.onkeydown=e=>{if(e.key==="Enter"||e.key===" ")locateMe();};}
   $("#closeSheet").onclick=closeSheet;
   $("#scrim").onclick=closeSheet;
@@ -1620,7 +1640,7 @@ async function loadAll(){
   const lat=APP.lat,lng=APP.lng;
   try{
     const [modsP,ensP,fcP,miniP,qwP,cyP,sxP]=await Promise.allSettled([
-      fetchModels(lat,lng),fetchEnsemble(lat,lng),fetchForecast(lat,lng),fetchMinutely(lat,lng),
+      fetchAllModels(lat,lng),fetchEnsemble(lat,lng),fetchForecast(lat,lng),fetchMinutely(lat,lng),
       fetchQWeather(lat,lng,ST.qkey),fetchCaiyun(lat,lng,ST.ckey),fetchSeniverse(lat,lng,ST.sxkey)
     ]);
     let mp=modsP.status==="fulfilled"?modsP.value:null;

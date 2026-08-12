@@ -243,6 +243,24 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent;overf
 .sv .sd{font-size:var(--t-cap);color:var(--secondaryLabel)}
 .sv .x{color:var(--systemRed);font-size:var(--t-callout);font-weight:600;padding:4px}
 .note{font-size:12px;color:var(--secondaryLabel);line-height:1.6;margin-top:6px}
+
+/* ───── 逐变量权重：自定义下拉（风格对齐地址面板紧凑行）───── */
+.dd{position:relative;margin-top:10px}
+.dd-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;
+  background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border:.5px solid var(--separator);border-radius:var(--r-ctl);box-shadow:none;font-size:16px;color:var(--label);text-align:left}
+.dd-btn:active{transform:scale(.99)}
+.dd-arr{color:var(--secondaryLabel);transition:transform .2s ease;flex:0 0 auto}
+.dd.open .dd-arr{transform:rotate(180deg)}
+.dd-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;
+  background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border:.5px solid var(--separator);border-radius:var(--r-ctl);box-shadow:var(--shadow-card);overflow:hidden;
+  max-height:60vh;overflow-y:auto;display:none}
+.dd.open .dd-menu{display:block}
+.dd-item{padding:9px 14px;font-size:15px;color:var(--label);border-bottom:.5px solid var(--separator);cursor:pointer}
+.dd-item:last-child{border-bottom:none}
+.dd-item:active,.dd-item:hover{background:rgba(88,86,214,.08)}
+.dd-item.on{color:var(--systemIndigo);font-weight:600}
 .evid{margin:8px 0 10px;color:var(--secondaryLabel);font-size:13px;line-height:1.6}
 .warn{color:var(--systemRed);font-size:12px;margin-top:6px;min-height:14px}
 
@@ -413,7 +431,13 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
       <h3>逐变量权重</h3>
       <div class="note">同一家预报中心在不同的天气项目上强弱不一样，所以我们按「气温」「降水」「风速」等逐项给每家一个权重，下面是默认权重（记录过实测后会自动调整）。</div>
       <div class="evid" id="varEvid"></div>
-      <select id="varSel" class="vsel"></select>
+      <div class="dd" id="varDd">
+        <button class="dd-btn" id="varBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span id="varBtnTxt">气温</span>
+          <svg class="dd-arr" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dd-menu" id="varMenu" role="listbox" aria-hidden="true"></div>
+      </div>
       <div id="varWeights"></div>
     </div>
   </section>
@@ -1939,17 +1963,24 @@ function computeConfidence(){
   const score=Math.max(40,Math.min(99,Math.round(55+liveN*4-stdev*4)));
   return {score,liveN,stdev};
 }
+function closeVarDd(){const dd=$("#varDd");if(dd){dd.classList.remove("open");$("#varBtn").setAttribute("aria-expanded","false");}}
+function _varOutside(e){if(!e.target.closest("#varDd"))closeVarDd();}
 function renderVarWeights(){
-  const sel=$("#varSel");
-  if(!sel)return;
-  if(!sel.dataset.filled){
+  const dd=$("#varDd");
+  if(!dd)return;
+  const menu=$("#varMenu");
+  if(!dd.dataset.filled){
     Object.keys(SKILL).forEach(vk=>{
-      const o=document.createElement("option");o.value=vk;o.textContent=VAR_LABEL[vk];sel.appendChild(o);
+      const it=document.createElement("div");it.className="dd-item";it.dataset.v=vk;it.setAttribute("role","option");
+      it.textContent=VAR_LABEL[vk];
+      it.onclick=()=>{dd.dataset.v=vk;renderVarWeights();closeVarDd();};
+      menu.appendChild(it);
     });
-    sel.dataset.filled="1";
-    sel.onchange=()=>renderVarWeights();
+    dd.dataset.filled="1";
+    $("#varBtn").onclick=()=>{dd.classList.toggle("open");$("#varBtn").setAttribute("aria-expanded",dd.classList.contains("open"));};
+    document.addEventListener("mousedown",_varOutside,true);
   }
-  const vk=sel.value||"temp";
+  const vk=dd.dataset.v||"temp";
   const col=SKILL[vk];let tot=0;for(const k in col)tot+=col[k];
   const box=$("#varWeights");box.innerHTML="";
   const rows=MODELS.filter(m=>col[m.key]!=null).sort((a,b)=>col[b.key]-col[a.key]);

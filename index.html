@@ -292,14 +292,18 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 
 /* ───── 内联地址簿（从顶栏底部延伸，非底部弹层） ───── */
 .addr-panel{display:grid;grid-template-rows:0fr;opacity:0;overflow:hidden;z-index:29;
-  background:var(--secondarySystemBackground);box-shadow:var(--shadow-card);
+  background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
   border-radius:0 0 var(--r-card) var(--r-card);
   transition:grid-template-rows .35s cubic-bezier(.32,.72,0,1),opacity .28s ease}
 .addr-panel.on{grid-template-rows:1fr;opacity:1}
-.addr-panel .inner{overflow:hidden;min-height:0;padding:2px 14px max(12px,env(safe-area-inset-bottom))}
-.ap-head{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 10px;font-size:var(--t-h2);font-weight:700;color:var(--label)}
+.addr-panel .inner{overflow:hidden;min-height:0;padding:2px 12px max(12px,env(safe-area-inset-bottom))}
+/* 面板内的行：去掉厚重阴影与超大圆角，改成紧凑卡片，与位置模块保持一致 */
+.addr-panel .inner>.sv{border-radius:12px;box-shadow:none;margin-bottom:6px;padding:9px 14px}
+.addr-panel .inner>.sv:last-child{margin-bottom:0}
+.addr-panel .inner>.sv .sd{display:none}
+.ap-head{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 8px;font-size:var(--t-h2);font-weight:700;color:var(--label)}
 .ap-go{font-size:var(--t-callout);font-weight:600;color:var(--systemIndigo);cursor:pointer}
-.ap-empty{padding:12px 2px 6px;color:var(--secondaryLabel);font-size:var(--t-callout)}
+.ap-empty{padding:10px 4px 4px;color:var(--secondaryLabel);font-size:var(--t-callout)}
 .sv.cur{background:rgba(88,86,214,.07)}
 .keyrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
 .keyrow label{font-size:var(--t-callout);font-weight:600;width:64px;flex:0 0 auto}
@@ -332,8 +336,8 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     <div class="hrow">
       <div class="loc" id="locName">
         <div>
-          <div class="lname" id="locLName">定位中…</div>
-          <small id="locSub">正在获取位置</small>
+          <div class="lname" id="locLName">选择位置</div>
+          <small id="locSub"></small>
         </div>
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
@@ -1542,28 +1546,36 @@ function cnName(j){
   const ded=parts.filter((x,i)=>i===0||x!==parts[i-1]);
   return ded.join("").replace(/(上海市|北京市|天津市|重庆市|香港特别行政区|澳门特别行政区|台湾省)/g,"$1");
 }
-/* 规范中文地址：省+市+区+详细；直辖市特殊（如 上海市 同时是省与市，不再重复"市"）。
-   用于顶栏 / 搜索结果 / 地图选点 / 地址簿等所有地址显示，保证全站格式统一。 */
+/* 规范中文地址：省+市+区+道路门牌，保留原始后缀（不再剥"新区"的"区"，避免"浦东新"）。
+   直辖市特殊（上海市本身已含"市"，直接作 head）；结果包含具体道路/门牌，确保
+   "上海市浦东新区由由新邸"等具体地址能完整展示。 */
 function fmtCnAddr(j){
   if(!j)return "";
-  const a=j.address||{};
-  const MUNI=["北京市","天津市","上海市","重庆市"];
-  const cut=s=>(s||"").replace(/(省|市|区|县|自治州|盟|地区)$/,"").trim();
-  const prov=cut(a.state||a.province||"");
-  const city=cut(a.city||a.town||a.village||"");
-  const dist=cut(a.county||a.district||"");
-  const sub=cut(a.suburb||a.neighbourhood||a.city_district||"");
-  const road=((a.road||a.pedestrian||"")+(a.house_number||"")).trim();
-  let head;
-  if(MUNI.some(m=>cut(m)===prov)){
-    head=prov+"市";                                   // 直辖市：上海市 本身就是 省+市
-  }else{
-    head=(prov?prov+"省":"")+(city?city+"市":"");
+  const a=j.address;
+  if(a){
+    const MUNI=["北京市","天津市","上海市","重庆市"];
+    const prov=a.state||a.province||"";
+    const city=a.city||a.town||"";
+    const dist=a.county||a.district||"";
+    const sub=a.suburb||a.neighbourhood||a.city_district||"";
+    const road=((a.road||a.pedestrian||"")+(a.house_number||"")).trim();
+    /* head：直辖市用省名（已含"市"），普通省用"省+市"原样拼接（city 已含"市"则不再补） */
+    let head="";
+    if(prov&&MUNI.includes(prov)){
+      head=prov;                            // 上海市
+    }else{
+      head=(prov||"")+(city||"");           // 广东省深圳市
+    }
+    const parts=[head];
+    if(dist&&parts.join("").indexOf(dist)===-1) parts.push(dist);   // 浦东新区
+    if(sub&&parts.join("").indexOf(sub)===-1) parts.push(sub);      // 潍坊新村街道
+    if(road) parts.push(road);                                       // 由由新邸
+    const full=parts.join("");
+    /* 仅去重相邻重复的"省/市/区/县"字，避免误吃普通叠字（如"由由"→"由"）。 */
+    const deduped=full.replace(/([省市区县])\1+/g,"$1");
+    if(deduped)return deduped;
   }
-  const d=dist&&head.indexOf(dist)===-1?dist:"";       // 避免区名已在 head 里重复
-  const sb=sub&&(head+d).indexOf(sub)===-1?sub:"";
-  const full=(head+d+sb+road).replace(/([省市区县])\1+/g,"$1");
-  return full||(j.display_name||"").split(",")[0].trim();
+  return (j.display_name||"").split(",")[0].trim();
 }
 /* 从已保存项（{name,addr}）取统一格式地址：优先用存下的 Nominatim address 重新拼，
    保证全站格式一致；老数据没有 addr 时回退到已存的 name。 */
@@ -1586,9 +1598,8 @@ function locateMe(btn){
       const la=+pos.coords.latitude.toFixed(4),ln=+pos.coords.longitude.toFixed(4);
       btn.classList.remove("locating");
       if(msg)msg.textContent="";
-      /* 先立即刷新天气（用坐标占位名），反查到地名后再补名字，避免 Nominatim 卡住导致「无反应」。
-         persist=false：占位名"定位中…"只更新界面、不写 localStorage，刷新后不会残留。 */
-      setLoc(la,ln,"定位中…","",false);
+      /* 不再把顶栏覆盖成"定位中…"——图标旋转 + toast 已足够反馈；保留用户当前看到的名字，
+         仅在解析成功后才覆盖为真实地址，避免把"公司"/"由由"等已存名字冲掉或长期显示"定位中"。 */
       switchView("v-weather");
       toast("已定位，正在解析地址…");
       fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14",null,4000)
@@ -1596,12 +1607,14 @@ function locateMe(btn){
           const dn=j.display_name||"";
           const nm=fmtCnAddr(j)||dn.split(",")[0]||"当前位置";
           APP.addr=j.address||APP.addr;
-          setLoc(la,ln,nm,"");   // 真实地名，persist=true 落盘（副标题留空，顶栏只显示一行规范地址）
+          setLoc(la,ln,nm,"");   // 真实地名，persist=true 落盘
           toast("已定位到 "+nm);
         }).catch(()=>{
-          /* 反查失败：把顶栏从"定位中…"改成"当前位置"（仍不落盘），不残留占位文字 */
-          setLoc(la,ln,"当前位置","",false);
-          toast("已定位到当前位置");
+          /* 反查失败：只更新坐标与天气，不动顶栏名字（保留"公司"/"由由"/"选择位置"等） */
+          APP.lat=la;APP.lng=ln;
+          ST.lastLat=la;ST.lastLng=ln;save();
+          loadAll();
+          toast("已定位，但地址解析失败（请检查网络）");
         });
     },
     err=>{
@@ -1611,8 +1624,9 @@ function locateMe(btn){
       else if(err.code===2)msg.textContent="定位不可用：设备无法获取位置";
       else if(err.code===3)msg.textContent="定位超时：请到室外或信号好的位置重试";
       else msg.textContent="定位失败："+(err.message||"未知错误");}
+      toast("定位失败：请点击顶部地址手动选择，或到浏览器设置中允许定位");
     },
-    {enableHighAccuracy:false,timeout:8000,maximumAge:300000}
+    {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
   );
 }
 /* persist=true 才会写入 localStorage；定位过程中用 persist=false，避免把"定位中…"这种占位名
@@ -1670,7 +1684,7 @@ function renderAddrPanel(){
   inner.appendChild(h);
   h.querySelector("#apGo").onclick=()=>{toggleAddrPanel(false);switchView("v-loc");};
   const add=document.createElement("div");add.className="sv save-cta";
-  add.innerHTML='<div style="flex:1"><div class="sn">保存当前位置</div><div class="sd">给当前点起个名字，方便一键切换</div></div>'+
+  add.innerHTML='<div style="flex:1"><div class="sn">保存当前位置</div></div>'+
     '<div class="x" style="color:var(--systemIndigo);font-weight:700">保存</div>';
   add.onclick=()=>{saveCurrent();renderAddrPanel();};
   inner.appendChild(add);
@@ -1732,7 +1746,7 @@ function renderSaved(){
   const box=$("#savedList");box.innerHTML="";
   /* 顶部始终显示「保存当前位置」主按钮 */
   const add=document.createElement("div");add.className="sv save-cta";
-  add.innerHTML='<div style="flex:1"><div class="sn">保存当前位置</div><div class="sd">给当前点起个名字，方便一键切换</div></div>'+
+  add.innerHTML='<div style="flex:1"><div class="sn">保存当前位置</div></div>'+
     '<div class="x" style="color:var(--systemIndigo);font-weight:700">保存</div>';
   add.onclick=saveCurrent;
   box.appendChild(add);
@@ -2024,7 +2038,10 @@ function boot(){
       navigator.geolocation.getCurrentPosition(pos=>{
         APP.lat=pos.coords.latitude;APP.lng=pos.coords.longitude;
         reverseLoc(APP.lat,APP.lng);
-      },()=>{ },{timeout:8000});
+      },err=>{
+        /* 首次打开且无缓存：顶栏静态为"选择位置"，失败时保持并 toast 引导用户手动选 */
+        toast("自动定位失败：请点击顶部地址手动选择，或到浏览器设置中允许定位");
+      },{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
     }
   }
   /* header 地点点击 → 从顶栏底部顺滑延伸出地址簿（不再从屏幕底部滑入弹层） */

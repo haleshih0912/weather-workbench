@@ -1520,7 +1520,8 @@ function _geoOutside(e){
   closeGeoRes();
 }
 async function geoSearch(q){
-  const res=$("#geoRes");res.innerHTML='<div style="color:var(--secondaryLabel)">搜索中…</div>';
+  const res=$("#geoRes");
+  const btn=$("#geoBtn");btn.textContent="搜索中";btn.disabled=true;
   try{
     const lat=APP.lat!=null?APP.lat:31.2304, lng=APP.lng!=null?APP.lng:121.4737;
     const qs=geoQueries(q);
@@ -1535,7 +1536,7 @@ async function geoSearch(q){
       }catch(e){}
       await new Promise(r=>setTimeout(r,200)); // 尊重 Nominatim 匿名 1 req/s 限制
     }
-    if(!all.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';return;}
+    if(!all.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';btn.textContent="搜索";btn.disabled=false;return;}
     const seen=new Set();
     const uniq=all.filter(p=>{const k=Math.round(+p.lat*1000)+","+Math.round(+p.lon*1000);if(seen.has(k))return false;seen.add(k);return true;});
     uniq.forEach(p=>{p._d=haversine(lat,lng,+p.lat,+p.lon);});
@@ -1558,9 +1559,11 @@ async function geoSearch(q){
     });
     document.removeEventListener("mousedown",_geoOutside,true);
     document.addEventListener("mousedown",_geoOutside,true);
+    btn.textContent="搜索";btn.disabled=false;
   }catch(e){
     res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';
     document.removeEventListener("mousedown",_geoOutside,true);
+    btn.textContent="搜索";btn.disabled=false;
   }
 }
 /* 搜索结果主名：优先用要素名（楼名/POI/路名/街道名），更贴近用户搜的词；

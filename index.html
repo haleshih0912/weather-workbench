@@ -550,7 +550,9 @@ function load(){
   try{const j=JSON.parse(localStorage.getItem(LS+"state")||"{}");ST=Object.assign(ST,j);}catch(e){}
   /* 迁移：旧版本曾把"定位中…"这类占位名写进了 localStorage，导致刷新后顶栏永久显示。
      检测到就整体清掉，回退到默认位置（上海），下次定位会正常解析真实地名。 */
-  if(ST.lastName&&/^(定位中|我的位置|加载中|locating)\s*$/i.test(ST.lastName.trim())){
+  /* 宽松匹配：旧版本把"定位中…"（带省略号）等占位名写进了 localStorage，
+     原正则 ^定位中$ 漏掉了省略号/句号，导致刷新后顶栏永久显示"定位中…"。 */
+  if(ST.lastName&&/^(定位中|我的位置|加载中|locating|获取中|当前位置|未知|位置)[.。…·•*\s]*$/i.test(ST.lastName.trim())){
     ST.lastName=null;ST.lastSub=null;ST.lastLat=null;ST.lastLng=null;save();
   }
 }
@@ -1497,28 +1499,71 @@ function haversine(la1,lo1,la2,lo2){
   const a=Math.sin(dLa/2)**2+Math.cos(toR(la1))*Math.cos(toR(la2))*Math.sin(dLo/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
+/* Nominatim 的 q= 不做子串展开："花木"只能命中名为"花木"的 3 个远郊村落，
+   而用户想要的"花木街道/花木路/花木新村/花木派出所"是不同词条。
+   策略：原词 + 常见地理后缀变体并行查询，合并后按与当前坐标的距离重排。 */
+function geoQueries(q){
+  const base=(q||"").trim();if(!base)return [base];
+  const sufs=["街道","路","新村","派出所","社区","小区","广场","公园"];
+  const set=new Set([base]);
+  if(!sufs.some(s=>base.endsWith(s))) sufs.forEach(s=>set.add(base+s));
+  return [...set];
+}
 async function geoSearch(q){
   const res=$("#geoRes");res.innerHTML='<div style="color:var(--secondaryLabel)">搜索中…</div>';
   try{
-    const r=await fetchTO("https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=8&accept-language=zh-CN&q="+encodeURIComponent(q));
-    const j=await r.json();
-    if(!j.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';return;}
-    const la0=APP.lat!=null?APP.lat:39.9042,lo0=APP.lng!=null?APP.lng:116.4074;
-    j.forEach(p=>{p._d=haversine(la0,lo0,+p.lat,+p.lon);});
-    j.sort((a,b)=>a._d-b._d);
-    res.innerHTML="";
-    j.forEach(p=>{
-      const d=document.createElement("div");d.style.display="flex";d.style.alignItems="center";d.style.gap="6px";
+    const lat=APP.lat!=null?APP.lat:31.2304, lng=APP.lng!=null?APP.lng:121.4737;
+    const qs=geoQueries(q);
+    const all=[];
+    for(const t of qs){
+      try{
+        const url="https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=6&accept-language=zh-CN"
+          +"&lat="+lat+"&lon="+lng+"&q="+encodeURIComponent(t);
+        const r=await fetchTO(url);
+        const j=await r.json();
+        if(Array.isArray(j)) j.forEach(p=>all.push(p));
+      }catch(e){}
+      await new Promise(r=>setTimeout(r,200)); // 尊重 Nominatim 匿名 1 req/s 限制
+    }
+    if(!all.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';return;}
+    const seen=new Set();
+    const uniq=all.filter(p=>{const k=Math.round(+p.lat*1000)+","+Math.round(+p.lon*1000);if(seen.has(k))return false;seen.add(k);return true;});
+    uniq.forEach(p=>{p._d=haversine(lat,lng,+p.lat,+p.lon);});
+    uniq.sort((a,b)=>a._d-b._d);
+    const top=uniq.slice(0,20);
+    res.innerHTML="";res.style.maxHeight="60vh";res.style.overflowY="auto";
+    top.forEach(p=>{
+      const d=document.createElement("div");d.style.cssText="display:flex;align-items:center;gap:6px;padding:10px 2px;border-bottom:1px solid var(--separator)";
       const km=p._d>=1?p._d.toFixed(0)+" km":Math.round(p._d*1000)+" m";
-      const name=fmtCnAddr(p)||p.display_name.split(",")[0];
-      const sub="";
-      const nm=document.createElement("span");nm.style.cssText="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";nm.textContent=name;
+      const name=geoLabel(p);
+      const sub=geoSub(p);
+      const left=document.createElement("div");left.style.cssText="flex:1;min-width:0";
+      const nm=document.createElement("div");nm.style.cssText="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600";nm.textContent=name;
+      const sb=document.createElement("div");sb.style.cssText="color:var(--secondaryLabel);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";sb.textContent=sub;
+      left.appendChild(nm);left.appendChild(sb);
       const dist=document.createElement("span");dist.style.cssText="flex:0 0 auto;margin-left:8px;color:var(--systemIndigo);font-family:var(--font-num);font-weight:600;font-size:12px";dist.textContent=km;
-      d.appendChild(nm);d.appendChild(dist);
+      d.appendChild(left);d.appendChild(dist);
       d.onclick=()=>{APP.addr=p.address||APP.addr;setLoc(+p.lat,+p.lon,name,sub);switchView("v-weather");};
       res.appendChild(d);
     });
   }catch(e){res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';}
+}
+/* 搜索结果主名：优先用要素名（楼名/POI/路名/街道名），更贴近用户搜的词；
+   否则用规范中文地址；再不行取 display_name 首段。 */
+function geoLabel(p){
+  const first=(p.display_name||"").split(",")[0].trim();
+  if(p.name&&p.name.trim()&&p.name.trim()!==first) return p.name.trim();
+  const c=fmtCnAddr(p);
+  if(c) return c;
+  return first;
+}
+/* 搜索结果次要行：展示所在区/市，帮助用户判断方位（去掉已出现在主名里的部分）。 */
+function geoSub(p){
+  const label=geoLabel(p);
+  const dn=(p.display_name||"").replace(/,\s*(中国|China|CN)\b/gi,"").split(",").map(s=>s.trim()).filter(Boolean);
+  const i=dn.findIndex(s=>s===label||label.indexOf(s)===0);
+  const rest=dn.slice(i>=0?i+1:1);
+  return rest.slice(0,2).join(" · ");
 }
 /* 自动定位：浏览器 GPS → 反查地名 → 加载预报 */
 /* 把 Nominatim display_name 末尾的 ", 中国" / ", China" / ", CN" 剥掉，折叠多余逗号。
@@ -2030,7 +2075,9 @@ function boot(){
   setupNav();setupSheet();setupCal();setupLoc();
   enableDragScroll($("#strip"));
   if(ST.lastLat!=null&&ST.lastLng!=null){
-    APP.lat=ST.lastLat;APP.lng=ST.lastLng;APP.name=ST.lastName||"位置";APP.sub="";APP.addr=null;
+    APP.lat=ST.lastLat;APP.lng=ST.lastLng;APP.name=ST.lastName||"选择位置";APP.sub="";APP.addr=null;
+    /* 双保险：即便迁移漏网的占位名也强制回退，避免顶栏出现"定位中…" */
+    if(/^(定位中|我的位置|加载中|locating|获取中|当前位置|未知|位置)[.。…·•*\s]*$/.test(APP.name)) APP.name="选择位置";
     $("#locLName").textContent=APP.name;
     $("#locSub").textContent="";
   }else{

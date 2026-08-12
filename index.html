@@ -95,6 +95,11 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .iconbtn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(120,120,128,.12);flex:0 0 auto}
 .iconbtn:active{transform:scale(.92)}
 .iconbtn svg{width:18px;height:18px;fill:none;stroke:var(--label);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn.locating{opacity:.55;pointer-events:none}
+.iconbtn.locating svg{animation:iconSpin .9s linear infinite;transform-origin:50% 50%}
+@keyframes iconSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.iconbtn .lbl{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;height:100%}
+.iconbtn .lbl svg{flex:0 0 auto}
 .sync{font-size:var(--t-cap);color:var(--secondaryLabel);text-align:right;line-height:1.25}
 .sync b{color:var(--label);font-weight:500}
 
@@ -135,7 +140,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 .card{background:var(--glass-strong);border-radius:var(--r-card);padding:16px;margin-bottom:14px}
 .card h3{margin:0 0 12px;font-size:var(--t-callout);font-weight:600;color:var(--secondaryLabel);letter-spacing:.4px;display:flex;align-items:center;gap:6px}
 .card h3 .tag{margin-left:auto;font-size:var(--t-cap);font-weight:600;color:var(--systemIndigo);background:rgba(88,86,214,.1);padding:2px 8px;border-radius:var(--r-pill)}
-.card h3 .unit{margin-left:6px;font-size:var(--t-cap);font-weight:600;color:var(--tertiaryLabel);font-family:var(--font-num)}
+.card h3 .unit{margin-left:auto;font-size:var(--t-cap);font-weight:600;color:var(--tertiaryLabel);font-family:var(--font);letter-spacing:.2px;font-variant-numeric:tabular-nums}
 
 /* ───── charts（统一 padding 44/16/20/30） ───── */
 .chart-wrap{width:100%;overflow:hidden;position:relative}
@@ -160,7 +165,7 @@ header{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(140,140,150,.35);border-radius:8px;border:2px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:rgba(140,140,150,.6);background-clip:content-box}
-html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
+html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent;overflow-y:scroll;scrollbar-gutter:stable}
 .hc{flex:0 0 auto;width:64px;background:var(--glass-strong);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:var(--r-card);box-shadow:var(--shadow-hc);
   padding:10px 8px;text-align:center;transition:transform .15s}
 .hc:active{transform:scale(.95)}
@@ -208,6 +213,8 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .so .info .nm{font-size:14px;font-weight:600}
 .so .info .dt{font-size:var(--t-cap);color:var(--secondaryLabel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .so .wk{font-size:var(--t-callout);font-weight:700;color:var(--systemIndigo);font-family:var(--font-num);flex:0 0 auto}
+.so.muted{opacity:.5}
+.so.muted .nm,.so.muted .dt,.so.muted .wk{color:var(--tertiaryLabel)}
 .conf-box{margin-top:14px;padding:14px 16px;background:rgba(88,86,214,.10);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:var(--r-card);box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:6px}
 .conf-head{font-size:var(--t-callout);color:var(--secondaryLabel);font-weight:600;display:flex;align-items:baseline;gap:8px}
 .conf-head b{color:var(--systemIndigo);font-size:22px;font-weight:700;font-family:var(--font-num);letter-spacing:-.5px}
@@ -234,7 +241,7 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent}
 .sv .sd{font-size:var(--t-cap);color:var(--secondaryLabel)}
 .sv .x{color:var(--systemRed);font-size:var(--t-callout);font-weight:600;padding:4px}
 .note{font-size:12px;color:var(--secondaryLabel);line-height:1.6;margin-top:6px}
-.evid{padding:11px 13px;background:rgba(88,86,214,.07);border-left:3px solid var(--systemIndigo);border-radius:var(--r-ctl);margin:10px 0 4px;color:var(--label);font-size:13px;line-height:1.65;font-weight:400}
+.evid{margin:8px 0 10px;color:var(--secondaryLabel);font-size:13px;line-height:1.6}
 .warn{color:var(--systemRed);font-size:12px;margin-top:6px;min-height:14px}
 
 /* ───── calibrate ───── */
@@ -272,6 +279,15 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 .sheet .btn.sec{background:rgba(120,120,128,.16);color:var(--label)}
 .sheet .btn.danger{background:rgba(255,59,48,.1);color:var(--systemRed)}
 .sheet input[type=file]{display:none}
+.lrow{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:.5px solid var(--separator);cursor:pointer}
+.lrow:last-child{border-bottom:none}
+.lrow:active{background:rgba(120,120,128,.08)}
+.lrow .nm{flex:1;font-size:15px;font-weight:600;line-height:1.3;min-width:0}
+.lrow .sub{font-size:12px;color:var(--secondaryLabel);font-weight:400;margin-top:2px;display:block;max-height:2.6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .ck{color:var(--systemIndigo);font-weight:700;font-size:13px;flex:0 0 auto}
+.lrow.cur{background:rgba(88,86,214,.07)}
+.lrow .x{color:var(--tertiaryLabel);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 auto}
+.lrow .x:active{background:rgba(255,59,48,.15);color:var(--systemRed)}
 .keyrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
 .keyrow label{font-size:var(--t-callout);font-weight:600;width:64px;flex:0 0 auto}
 .keyrow input{flex:1;padding:10px 12px;border:.5px solid var(--separator);background:var(--systemBackground);outline:none}
@@ -341,12 +357,12 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     </div>
 
     <div class="card">
-      <h3>未来 24 小时气温 <span class="tag" id="tempSrc">综合</span><span class="unit" id="tempUnit">°C</span></h3>
+      <h3>未来 24 小时气温<span class="unit" id="tempUnit">°C</span></h3>
       <div class="chart-wrap" id="tempChart"></div>
     </div>
 
     <div class="card">
-      <h3>未来 24 小时降水 <span class="tag" id="precipSrc">综合</span><span class="unit" id="precipUnit">%</span></h3>
+      <h3>未来 24 小时降水<span class="unit" id="precipUnit">%</span></h3>
       <div class="chart-wrap" id="precipChart"></div>
     </div>
 
@@ -375,8 +391,8 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
     <div class="card">
       <h3>逐变量权重</h3>
       <div class="note">同一家预报中心在不同的天气项目上强弱不一样，所以我们按「气温」「降水」「风速」等逐项给每家一个权重，下面是默认权重（记录过实测后会自动调整）。</div>
-      <select id="varSel" class="vsel"></select>
       <div class="evid" id="varEvid"></div>
+      <select id="varSel" class="vsel"></select>
       <div id="varWeights"></div>
     </div>
   </section>
@@ -510,7 +526,14 @@ const APP={lat:31.2304,lng:121.4737,name:"上海",sub:"人民广场"};
 
 /* ---------- state ---------- */
 let ST={lastLat:null,lastLng:null,lastName:null,lastSub:null,saved:[],cal:{},qkey:"",ckey:"",sxkey:"",mapLat:null,mapLng:null};
-function load(){try{const j=JSON.parse(localStorage.getItem(LS+"state")||"{}");ST=Object.assign(ST,j);}catch(e){}}
+function load(){
+  try{const j=JSON.parse(localStorage.getItem(LS+"state")||"{}");ST=Object.assign(ST,j);}catch(e){}
+  /* 迁移：旧版本曾把"定位中…"这类占位名写进了 localStorage，导致刷新后顶栏永久显示。
+     检测到就整体清掉，回退到默认位置（上海），下次定位会正常解析真实地名。 */
+  if(ST.lastName&&/^(定位中|我的位置|加载中|locating)\s*$/i.test(ST.lastName.trim())){
+    ST.lastName=null;ST.lastSub=null;ST.lastLat=null;ST.lastLng=null;save();
+  }
+}
 function save(){try{localStorage.setItem(LS+"state",JSON.stringify(ST));}catch(e){}}
 
 /* ---------- time sync ---------- */
@@ -523,12 +546,12 @@ function fetchTO(url,opts={},ms=10000){
 }
 async function syncTime(){
   try{
-    let r=await fetchTO("https://worldtimeapi.org/api/timezone/Asia/Shanghai",{cache:"no-store"},6000);
+    let r=await fetchTO("https://worldtimeapi.org/api/timezone/Asia/Shanghai",{cache:"no-store"},2500);
     if(r.ok){let j=await r.json();let st=new Date(j.datetime).getTime();let off=st-Date.now();
       if(Math.abs(off)<600000){timeOffset=off;return "互联网";}}
   }catch(e){}
   try{
-    let r=await fetchTO("https://api.open-meteo.com/v1/forecast?latitude=31.2&longitude=121.4&current=temperature_2m",{method:"HEAD",cache:"no-store"},6000);
+    let r=await fetchTO("https://api.open-meteo.com/v1/forecast?latitude=31.2&longitude=121.4&current=temperature_2m",{method:"HEAD",cache:"no-store"},2500);
     let dh=r.headers.get("date");
     if(dh){let st=new Date(dh).getTime();timeOffset=st-Date.now();return "互联网";}
   }catch(e){}
@@ -866,13 +889,30 @@ function blend(models,keyFn,i,varKey){
   }
   return w?s/w:null;
 }
+/* 风向是「环形量」——0° 与 360° 相接，不能用度数算术平均。
+   反例：350°(偏北) 与 10°(偏北) 算术平均 = 180°(正南风)，完全错误。
+   正确做法：转成单位向量 (sinθ, cosθ) 做加权合成，再 atan2 还原角度。
+   气象约定：风向=风的来向，自正北顺时针；来向单位向量分量取 (sinθ, cosθ)。 */
+function blendDir(models,i){
+  let X=0,Y=0,w=0;
+  for(const m of models){
+    const arr=m.dir;if(!arr||arr[i]==null)continue;
+    const rad=arr[i]*Math.PI/180;
+    const ew=effWeight(m.key,"dir");
+    X+=Math.sin(rad)*ew;Y+=Math.cos(rad)*ew;w+=ew;
+  }
+  if(w===0)return null;
+  let deg=Math.atan2(X,Y)*180/Math.PI;
+  deg=(deg%360+360)%360;
+  return deg;
+}
 function blendMap(models,i){
   return {
     temp:blend(models,m=>m.temp,i,"temp"),
     precip:blend(models,m=>m.precip,i,"precip"),
     wind:blend(models,m=>m.wind,i,"wind"),
     gust:blend(models,m=>m.gust,i,"gust"),
-    dir:blend(models,m=>m.dir,i,"dir"),
+    dir:blendDir(models,i),
     hum:blend(models,m=>m.hum,i,"hum"),
     pres:blend(models,m=>m.pres,i,"pres"),
     cloud:blend(models,m=>m.cloud,i,"cloud"),
@@ -1083,6 +1123,38 @@ function buildAction(){
   if(c.uv!=null&&c.uv>=6)return "紫外线较强（强度 "+Math.round(c.uv)+"），建议防晒。";
   return "天气平稳，正常安排即可。";
 }
+/* 地面真实能见度（面向普通人，不展示"理想大气"值）。单位 km。
+   模式给的 visibility 是晴好天气下近地面（最低约 10m）的理想大气能见度，常 10–30 km，
+   但普通人关心的是"脚下此刻能看多远"——近地面高湿起雾、降水、城市霾都会显著压低它。
+   这里用「湿度→雾/霾」与「降水概率」两个普通人可感知的信号做现实修正，
+   并对高海拔（空气更洁净）做轻微上调，得到一个贴近生活的数字。 */
+function realVis(vmMeters, rh, pprob, elev){
+  let v=(vmMeters==null?10000:+vmMeters)/1000;   // 模式给的是米，转成 km
+  if(rh!=null){
+    if(rh>=97) v=Math.min(v,1.5);     // 雾：能见度骤降
+    else if(rh>=93) v=Math.min(v,3);  // 浓雾/湿临界
+    else if(rh>=88) v=Math.min(v,6);  // 轻雾/高湿
+    else if(rh>=80) v=Math.min(v,10); // 微湿
+  }
+  if(pprob!=null){
+    if(pprob>=0.7) v=Math.min(v,4);   // 明显降水
+    else if(pprob>=0.4) v=Math.min(v,8);
+  }
+  if(elev!=null&&elev>800){           // 高海拔空气更洁净，真实能见度略好（雾/雨压低优先）
+    const boost=elev>=2500?1.25:elev>=1500?1.15:1.08;
+    v=Math.min(v*boost,40);
+  }
+  return v;
+}
+/* 能见度分级（输入米）。用 realVis 修正后的现实值来分级，给普通人一个直觉判断。 */
+function visLabel(v){
+  v=(v==null?10000:+v);
+  if(v>=20000)return"清晰";
+  if(v>=10000)return"良好";
+  if(v>=5000)return"一般";
+  return"较差";
+}
+
 function render(){
   if(!D.time){return;}
   const t=D.time, n=t.length;
@@ -1104,7 +1176,8 @@ function render(){
   const cur=D.current;
   const wc=wcode(cur.weather_code);
   const isDay=(now().getHours()>=6&&now().getHours()<19);
-  $("#heroCond").innerHTML=wc[0]+'<div class="csub" id="heroCondSub">湿度 '+Math.round(cur.relative_humidity_2m)+'% · 能见度 '+Math.round((cur.visibility||10000)/1000)+' km</div>';
+  const rv=realVis(cur.visibility,cur.relative_humidity_2m,D.precipProb[startIdx],D.elevation);
+  $("#heroCond").innerHTML=wc[0]+'<div class="csub" id="heroCondSub">湿度 '+Math.round(cur.relative_humidity_2m)+'% · 能见度 '+(rv>=10?Math.round(rv):rv.toFixed(1))+' km（'+visLabel(rv*1000)+'）</div>';
   $("#heroTemp").textContent=Math.round(cur.temperature_2m)+"°";
   $("#heroFeels").textContent="体感 "+Math.round(cur.apparent_temperature)+"°";
   $("#heroWind").textContent="风 "+Math.round(cur.wind_speed_10m)+" km/h";
@@ -1263,11 +1336,22 @@ function fmtVal(m,v){
 
 function renderSources(){
   const box=$("#srcOverview");box.innerHTML="";
-  D.models.forEach(mod=>{
-    const w=Math.round(effWeight(mod.key)/liveWeightSum()*100);
-    const curT=mod.temp[D.startIdx]!=null?Math.round(mod.temp[D.startIdx])+"°":"—";
-    const curP=D.precipProb[D.startIdx]!=null?Math.round(D.precipProb[D.startIdx]*100)+"%":"—";
-    box.appendChild(so(mod.name,mod.country,mod.org,mod.color,curT+" / "+curP,w));
+  const liveKeys=new Set(D.models.map(m=>m.key));
+  /* 列出全部 8 家国际中心：有数据的正常显示（实时温度/降水 + 加权占比），
+     上游中断的（如 KMA 切换 KIM 模型、Open-Meteo 暂停分发）以「数据暂停」灰显，
+     仍写入来源清单并保留其配置权重，数据恢复后自动转为正常接入。 */
+  MODELS.forEach(mod=>{
+    const live=liveKeys.has(mod.key);
+    if(live){
+      const dm=D.models.find(m=>m.key===mod.key);
+      const w=Math.round(effWeight(mod.key)/liveWeightSum()*100);
+      const curT=dm&&dm.temp&&dm.temp[D.startIdx]!=null?Math.round(dm.temp[D.startIdx])+"°":"—";
+      const curP=D.precipProb[D.startIdx]!=null?Math.round(D.precipProb[D.startIdx]*100)+"%":"—";
+      box.appendChild(so(mod.name,mod.country,mod.org,mod.color,curT+" / "+curP,w));
+    }else{
+      const wp=Math.round(mod.prior*100);
+      box.appendChild(soMuted(mod.name,mod.country,mod.org,mod.color,"数据暂停",wp));
+    }
   });
   if(useQW){
     const w=Math.round(effWeight("qweather")/liveWeightSum()*100);
@@ -1278,23 +1362,35 @@ function renderSources(){
     box.appendChild(so("心知天气 Seniverse","中国","实时接入","#ff2d55",((useSX.now.temperature!=null?useSX.now.temperature:"?")+"° / "+(useSX.now.visibility!=null?useSX.now.visibility:"?")+"km"),w));
   }
   const conf=computeConfidence();
-  $("#srcCount").textContent=conf.liveN+" 家接入";
+  const total=MODELS.length+(useQW?1:0)+(useSX?1:0);
+  $("#srcCount").textContent=conf.liveN+" / "+total+" 接入";
   const confEl=document.createElement("div");
   confEl.className="conf-box";
   let cword = conf.stdev<0.8?"目前各源结论一致，可以放心参考。":conf.stdev<1.6?"目前各源结论大致一致。":"目前各源分歧偏大，建议参考临近更新。";
+  const paused=MODELS.filter(m=>!liveKeys.has(m.key)).map(m=>m.name);
+  const pnote=paused.length?(" 注：「"+paused.join("、")+"」上游数据暂时中断（非本程序问题，如 KMA 正在切换 KIM 模型、Open-Meteo 暂停分发），恢复后会自动接入并参与加权，无需手动操作。"):"";
   confEl.innerHTML='<div class="conf-head">综合可信度 <b>'+conf.score+'%</b></div>'+
-    '<div class="conf-detail">现在接入了 '+conf.liveN+' 个数据源。'+cword+' 这个百分比只是「多源一致程度」的参考，不等于降雨概率。</div>';
+    '<div class="conf-detail">现在实时接入了 '+conf.liveN+' 个数据源（共配置 '+total+' 个）。'+cword+pnote+' 这个百分比只是「多源一致程度」的参考，不等于降雨概率。</div>';
   box.appendChild(confEl);
 
   $("#srcNote").innerHTML=
     "综合预报 = 把每个预报源的结果按权重取平均。权重按「中国本土公开评测」分项目分配（详见下方「逐变量权重」），并会随校准中记录的实测自动调整。"+
-    "<br><br>下方仅展示已实际接入的数据源。填入和风天气、心知天气或彩云的密钥后，对应源会自动接入并参与综合；未填密钥的国内源（如 CMA、墨迹天气等）暂无可从浏览器直接调用的公开接口，因此暂不列出。";
+    "<br><br>下方展示所有已配置的 8 家国际中心。若某家标注「数据暂停」，说明该中心上游数据暂时中断（非本程序问题），数据恢复后会自动接入并参与综合。填入和风天气、心知天气或彩云的密钥后，对应源会自动接入并参与综合。";
   renderVarWeights();
 }
 function so(name,country,org,color,dt,wk){
   const el=document.createElement("div");el.className="so";
   const nm=name+(country?(" · "+country):"");
   el.innerHTML='<div class="badge" style="background:'+color+'">'+(name||"").slice(0,2)+'</div>'+
+    '<div class="info"><div class="nm">'+nm+'</div>'+
+    '<div class="dt">'+org+' · '+dt+'</div></div>'+
+    '<div class="wk">'+wk+'%</div>';
+  return el;
+}
+function soMuted(name,country,org,color,dt,wk){
+  const el=document.createElement("div");el.className="so muted";
+  const nm=name+(country?(" · "+country):"");
+  el.innerHTML='<div class="badge" style="background:'+color+';opacity:.4">'+(name||"").slice(0,2)+'</div>'+
     '<div class="info"><div class="nm">'+nm+'</div>'+
     '<div class="dt">'+org+' · '+dt+'</div></div>'+
     '<div class="wk">'+wk+'%</div>';
@@ -1369,9 +1465,9 @@ function pickMap(lat,lng){
 async function reverse(lat,lng){
   ST.mapLat=lat;ST.mapLng=lng;save();
   try{
-    const r=await fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18");
+    const r=await fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18",null,4000);
     const j=await r.json();
-    $("#mapAddr").textContent=j.display_name||(lat.toFixed(4)+", "+lng.toFixed(4));
+    $("#mapAddr").textContent=cnAddr(j.display_name||"")||(lat.toFixed(4)+", "+lng.toFixed(4));
   }catch(e){$("#mapAddr").textContent=lat.toFixed(4)+", "+lng.toFixed(4);}
 }
 function haversine(la1,lo1,la2,lo2){
@@ -1393,15 +1489,43 @@ async function geoSearch(q){
     j.forEach(p=>{
       const d=document.createElement("div");d.style.display="flex";d.style.alignItems="center";d.style.gap="6px";
       const km=p._d>=1?p._d.toFixed(0)+" km":Math.round(p._d*1000)+" m";
-      const name=document.createElement("span");name.style.cssText="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";name.textContent=p.display_name;
+      const name=cnName(p)||p.display_name.split(",")[0];
+      const sub=cnAddr(p.display_name);
+      const nm=document.createElement("span");nm.style.cssText="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";nm.textContent=name;
       const dist=document.createElement("span");dist.style.cssText="flex:0 0 auto;margin-left:8px;color:var(--systemIndigo);font-family:var(--font-num);font-weight:600;font-size:12px";dist.textContent=km;
-      d.appendChild(name);d.appendChild(dist);
-      d.onclick=()=>{setLoc(+p.lat,+p.lon,p.display_name.split(",")[0],p.display_name);switchView("v-weather");};
+      d.appendChild(nm);d.appendChild(dist);
+      d.onclick=()=>{setLoc(+p.lat,+p.lon,name,sub);switchView("v-weather");};
       res.appendChild(d);
     });
   }catch(e){res.innerHTML='<div style="color:var(--systemRed)">搜索失败（需联网）</div>';}
 }
 /* 自动定位：浏览器 GPS → 反查地名 → 加载预报 */
+/* 把 Nominatim display_name 末尾的 ", 中国" / ", China" / ", CN" 剥掉，折叠多余逗号。
+   默认都是国内地址，没必要重复出现「中国」。 */
+function cnAddr(s){
+  if(!s)return "";
+  /* 去掉各位置的 ", 中国" / ", China" / ", CN"（含其前后逗号空格） */
+  let t=String(s).replace(/,\s*(中国|China|CN)\b/gi,"");
+  /* 折叠连续逗号/空白 */
+  t=t.replace(/\s*,\s*,\s*/g,",").replace(/^[,\s]+|[,\s]+$/g,"");
+  return t;
+}
+/* 从 Nominatim j.address 拼一个简短的中文地名（省/市/区/街道），用于显示在顶栏。 */
+function cnName(j){
+  if(!j)return "";
+  const a=j.address;if(!a)return "";
+  const prv=a.province||a.state||"";
+  const cty=a.city||a.town||"";
+  const cnt=a.county||a.district||"";
+  const sub=a.suburb||a.neighbourhood||a.city_district||"";
+  /* 直辖市（上海市/北京市/...）province==city，不要重复 */
+  const parts=[prv,cty,cnt,sub].filter(Boolean);
+  if(!parts.length)return (j.display_name||"").split(",")[0];
+  /* 去重相邻相同的（如 "上海市 上海市"） */
+  const ded=parts.filter((x,i)=>i===0||x!==parts[i-1]);
+  return ded.join("").replace(/(上海市|北京市|天津市|重庆市|香港特别行政区|澳门特别行政区|台湾省)/g,"$1");
+}
+
 function locateMe(btn){
   btn=btn||$("#locBtn");
   const msg=$("#locAutoMsg");
@@ -1409,58 +1533,116 @@ function locateMe(btn){
     if(msg){msg.textContent="当前浏览器不支持定位 API";msg.style.color="var(--systemRed)";}
     return;
   }
-  const origTxt=btn.textContent;
-  btn.disabled=true;btn.textContent="定位中…";
+  btn.classList.add("locating");
   if(msg){msg.textContent="正在获取 GPS 坐标…";msg.style.color="var(--secondaryLabel)";}
   navigator.geolocation.getCurrentPosition(
     pos=>{
       const la=+pos.coords.latitude.toFixed(4),ln=+pos.coords.longitude.toFixed(4);
-      btn.disabled=false;btn.textContent=origTxt;
+      btn.classList.remove("locating");
       if(msg)msg.textContent="";
-      /* 先立即刷新天气（用坐标占位名），反查到地名后再补名字，避免 Nominatim 卡住导致「无反应」 */
-      setLoc(la,ln,"定位中…","");
+      /* 先立即刷新天气（用坐标占位名），反查到地名后再补名字，避免 Nominatim 卡住导致「无反应」。
+         persist=false：占位名"定位中…"只更新界面、不写 localStorage，刷新后不会残留。 */
+      setLoc(la,ln,"定位中…","",false);
       switchView("v-weather");
       toast("已定位，正在解析地址…");
-      fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14")
+      fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+la+"&lon="+ln+"&accept-language=zh-CN&zoom=14",null,4000)
         .then(r=>r.json()).then(j=>{
           const dn=j.display_name||"";
-          const nm=(j.address&&(j.address.city||j.address.town||j.address.county||j.address.province||j.address.state))||dn.split(",")[0]||"当前位置";
-          setLoc(la,ln,nm,dn);
+          const nm=cnName(j)||dn.split(",")[0]||"当前位置";
+          setLoc(la,ln,nm,cnAddr(dn));   // 真实地名，persist=true 落盘
           toast("已定位到 "+nm);
-        }).catch(()=>{toast("已定位到当前位置");});
+        }).catch(()=>{
+          /* 反查失败：把顶栏从"定位中…"改成"当前位置"（仍不落盘），不残留占位文字 */
+          setLoc(la,ln,"当前位置","",false);
+          toast("已定位到当前位置");
+        });
     },
     err=>{
-      btn.disabled=false;btn.textContent=origTxt;
+      btn.classList.remove("locating");
       if(msg){msg.style.color="var(--systemRed)";
       if(err.code===1)msg.textContent="定位被拒绝：请在浏览器设置中允许位置权限";
       else if(err.code===2)msg.textContent="定位不可用：设备无法获取位置";
       else if(err.code===3)msg.textContent="定位超时：请到室外或信号好的位置重试";
       else msg.textContent="定位失败："+(err.message||"未知错误");}
     },
-    {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
+    {enableHighAccuracy:false,timeout:8000,maximumAge:300000}
   );
 }
-function setLoc(lat,lng,name,sub){
-  ST.lastLat=lat;ST.lastLng=lng;ST.lastName=name;ST.lastSub=sub||"";save();
+/* persist=true 才会写入 localStorage；定位过程中用 persist=false，避免把"定位中…"这种占位名
+   永久存进本地，导致刷新后顶栏一直显示"定位中…"。成功解析到真实地名后再以 persist=true 落盘。 */
+function setLoc(lat,lng,name,sub,persist){
+  if(persist===undefined)persist=true;
   APP.lat=lat;APP.lng=lng;APP.name=name;APP.sub=sub||"";
   $("#locLName").textContent=name;
   $("#locSub").textContent=sub||"";
+  if(persist){
+    ST.lastLat=lat;ST.lastLng=lng;ST.lastName=name;ST.lastSub=sub||"";save();
+  }
   loadAll();
 }
-/* 已保存位置：一键切换 + 保存当前 */
+/* 通用列表弹层：标题 + 列表行（name/sub/可选删除）。点击行触发 onpick(i)，点删除触发 ondel(i)。 */
+function openSwitchSheet(title, items, opts){
+  /* opts:{current, onpick, ondel, deletable}  current:当前 name 高亮；ondel 可选；deletable[i]:该项是否可删；每项 {name,sub} */
+  let scrim=$("#switchScrim"),sheet=$("#switchSheet");
+  if(!scrim){scrim=document.createElement("div");scrim.id="switchScrim";scrim.className="scrim";
+    document.body.appendChild(scrim);}
+  if(!sheet){sheet=document.createElement("div");sheet.id="switchSheet";sheet.className="sheet";
+    document.body.appendChild(sheet);}
+  const close=()=>{sheet.classList.remove("on");scrim.classList.remove("on");setTimeout(()=>{sheet.innerHTML="";},300);};
+  scrim.onclick=close;
+  let html='<div class="grip"></div><h4>'+title+'</h4><div style="max-height:60vh;overflow-y:auto;margin:0 -8px;padding:0 8px">';
+  if(!items.length){html+='<div style="color:var(--secondaryLabel);text-align:center;padding:24px 0">还没有可选项</div>';}
+  items.forEach((s,i)=>{
+    const cur=opts.current&&s.name===opts.current?' cur':'';
+    const del=(opts.ondel&&(opts.deletable?opts.deletable[i]:true));
+    html+='<div class="lrow'+cur+'" data-i="'+i+'">'+
+      '<div class="nm">'+s.name+(opts.current&&s.name===opts.current?'<span class="ck" style="margin-left:8px">当前</span>':'')+
+        (s.sub?'<span class="sub">'+cnAddr(s.sub)+'</span>':'')+'</div>'+
+      (del?'<div class="x" data-x="'+i+'" title="删除">×</div>':'')+
+    '</div>';
+  });
+  html+='</div>';
+  sheet.innerHTML=html;
+  sheet.querySelectorAll(".lrow").forEach(row=>{
+    row.onclick=(e)=>{
+      if(e.target.dataset.x!=null){e.stopPropagation();return;}
+      const i=+row.dataset.i;close();opts.onpick&&opts.onpick(i);
+    };
+  });
+  sheet.querySelectorAll("[data-x]").forEach(x=>{x.onclick=(e)=>{e.stopPropagation();opts.ondel&&opts.ondel(+x.dataset.x);};});
+  scrim.classList.add("on");sheet.classList.add("on");
+}
+
+/* 已保存位置：点击弹层切换（一键选中，不用输数字）。无已保存位置时静默返回。 */
 function quickSwitch(){
-  if(!ST.saved.length)return;
+  if(!ST.saved.length){toast("还没保存过位置，先在底部「位置」里搜一下保存");switchView("v-loc");return;}
   const curName=ST.lastName||"";
-  const list=ST.saved.slice();
-  if(curName&&!list.find(s=>s.name===curName))list.unshift({name:curName,sub:"",lat:APP.lat,lng:APP.lng});
-  const choice=prompt("切换到已保存位置，输入序号：\n"+(list.map((s,i)=>(i+1)+". "+s.name+(s.sub?" — "+s.sub:"")).join("\n")));
-  const idx=parseInt(choice,10)-1;
-  if(!isNaN(idx)&&list[idx]){
-    const s=list[idx];
-    setLoc(s.lat,s.lng,s.name,s.sub||"");
-    switchView("v-weather");
-    toast("已切换到 "+s.name);
-  }
+  const items=ST.saved.slice();
+  /* 当前位置若不在已保存列表里，临时放到第一位（不可删除） */
+  const hasCur=!!items.find(s=>s.name===curName);
+  if(curName&&!hasCur)items.unshift({name:curName,sub:APP.sub||"",lat:APP.lat,lng:APP.lng});
+  /* deletable[i]：true 表示这是已保存项，可删除；临时插入的当前位置不可删 */
+  const deletable=items.map(s=>!!ST.saved.find(x=>x.name===s.name));
+  openSwitchSheet("切换到已保存位置",items,{
+    current:curName,
+    deletable,
+    onpick:(i)=>{
+      const s=items[i];
+      setLoc(s.lat,s.lng,s.name,s.sub||"");
+      switchView("v-weather");
+      toast("已切换到 "+s.name);
+    },
+    ondel:(i)=>{
+      if(!deletable[i])return;
+      const realI=ST.saved.findIndex(x=>x.name===items[i].name);
+      if(realI<0)return;
+      const rm=ST.saved[realI];
+      ST.saved.splice(realI,1);save();renderSaved();
+      toast("已删除「"+rm.name+"」");
+      /* 重新打开弹层（保持操作连贯） */
+      quickSwitch();
+    }
+  });
 }
 function saveCurrent(){
   if(!ST.lastLat){toast("还没定位到当前位置");return;}
@@ -1476,14 +1658,14 @@ function renderSaved(){
   const box=$("#savedList");box.innerHTML="";
   /* 顶部始终显示「保存当前位置」主按钮 */
   const add=document.createElement("div");add.className="sv save-cta";
-  add.innerHTML='<div style="flex:1"><div class="sn">📍 保存当前位置</div><div class="sd">给当前点起个名字，方便一键切换</div></div>'+
+  add.innerHTML='<div style="flex:1"><div class="sn">保存当前位置</div><div class="sd">给当前点起个名字，方便一键切换</div></div>'+
     '<div class="x" style="color:var(--systemIndigo);font-weight:700">保存</div>';
   add.onclick=saveCurrent;
   box.appendChild(add);
   if(!ST.saved.length)return;
   ST.saved.forEach((s,idx)=>{
     const el=document.createElement("div");el.className="sv";
-    el.innerHTML='<div style="flex:1"><div class="sn">'+s.name+'</div><div class="sd">'+s.sub+'</div></div>'+
+    el.innerHTML='<div style="flex:1"><div class="sn">'+s.name+'</div><div class="sd">'+cnAddr(s.sub)+'</div></div>'+
       '<div class="x" data-i="'+idx+'">删除</div>';
     el.querySelector(".sn").onclick=()=>{setLoc(s.lat,s.lng,s.name,s.sub);switchView("v-weather");toast("已切换到 "+s.name);};
     el.querySelector(".x").onclick=(e)=>{e.stopPropagation();ST.saved.splice(idx,1);save();renderSaved();};
@@ -1634,9 +1816,10 @@ function renderVarWeights(){
 let loading=false;
 async function loadAll(){
   if(loading)return;loading=true;
-  $("#heroCondSub").textContent="数据加载中…";
+  $("#heroCondSub").textContent="正在连接数据源…";
   const t0=performance.now();
-  const srcLabel=await syncTime();
+  /* 不阻塞：同步时间在后台跑，跑完自动更新顶部时间显示 */
+  syncTime().then(l=>{syncLabel=l;$("#syncBox").innerHTML="时间已同步<br><b>"+fmtClock(now())+"</b>";});
   const lat=APP.lat,lng=APP.lng;
   try{
     const [modsP,ensP,fcP,miniP,qwP,cyP,sxP]=await Promise.allSettled([
@@ -1651,7 +1834,7 @@ async function loadAll(){
     useCY=cyP.status==="fulfilled"?cyP.value:null;
     useSX=sxP.status==="fulfilled"?sxP.value:null;
 
-    if(!fc){toast("数据获取失败，请检查网络");loading=false;return;}
+    if(!fc){$("#heroCondSub").textContent="数据源连接失败 · 请检查网络或 Ctrl+F5 刷新";toast("数据获取失败，请检查网络");loading=false;return;}
     const ftime=fc.hourly.time;
     const nowStr=now();
     const curH=nowStr.getHours();
@@ -1710,6 +1893,7 @@ async function loadAll(){
     D.startIdx=startIdx;
     D.current=fc.current;
     D.daily=fc.daily;
+    D.elevation=fc.elevation;   // 模式返回的该点海拔（米），用于地面真实能见度修正
     /* 分钟级降水：三级回退 */
     D.mini=buildMini(mini,D.composite,startIdx,nowStr);
     if(useQW&&useQW.now){
@@ -1785,10 +1969,10 @@ async function tickSync(){
   syncLabel=await syncTime();
 }
 function reverseLoc(lat,lng){
-  fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18")
+  fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18",null,4000)
     .then(r=>r.json()).then(j=>{
-      const name=(j.address&&(j.address.city||j.address.town||j.address.county))||(j.display_name?j.display_name.split(",")[0]:"我的位置");
-      setLoc(lat,lng,name,j.display_name||"");
+      const name=cnName(j)||(j.display_name?j.display_name.split(",")[0]:"我的位置");
+      setLoc(lat,lng,name,cnAddr(j.display_name||""));
     }).catch(()=>{$("#locLName").textContent="已定位";$("#locSub").textContent=lat.toFixed(2)+","+lng.toFixed(2);});
 }
 

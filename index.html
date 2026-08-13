@@ -257,13 +257,13 @@ html{scrollbar-width:thin;scrollbar-color:rgba(140,140,150,.4) transparent;overf
 .dd-btn:active{transform:scale(.99)}
 .dd-arr{color:var(--secondaryLabel);transition:transform .2s ease;flex:0 0 auto}
 .dd.open .dd-arr{transform:rotate(180deg)}
-.dd-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;
+/* 改为 position:fixed：按视口坐标定位，彻底脱离文档流与任何祖先 overflow 裁剪 */
+.dd-menu{position:fixed;top:0;left:0;z-index:60;width:auto;right:auto;
   background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
   border:.5px solid var(--separator);border-radius:var(--r-ctl);box-shadow:var(--shadow-card);overflow-x:hidden;
   max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;-webkit-touch-callout:none;
   scrollbar-width:thin;scrollbar-color:rgba(120,120,128,.45) transparent;display:none}
 .dd.open .dd-menu{display:block}
-.dd.up .dd-menu{top:auto;bottom:calc(100% + 6px)}
 .dd-menu::-webkit-scrollbar{width:5px}
 .dd-menu::-webkit-scrollbar-track{background:transparent}
 .dd-menu::-webkit-scrollbar-thumb{background:rgba(120,120,128,.4);border-radius:6px}
@@ -1977,16 +1977,22 @@ function renderVarWeights(){
         dd.classList.toggle("open",open);
         $("#varBtn").setAttribute("aria-expanded",open);
         if(open){
-          /* 关键：max-height 严格限制在「按钮到视口边缘」的真实可用空间内（向下=到视口底，向上=到视口顶），
-             绝不超出视口，因此页面拉到底也不会被截断；超出的选项交给系统/iOS 原生滚动条上下滑动。 */
+          /* fixed 浮层：直接用 getBoundingClientRect 的视口坐标定位，不再受文档滚动/祖先影响。
+             向下空间不足（<200px）且向上空间更多时，改为向上展开；高度严格锁在视口可用空间内，绝不超出视口。 */
           const r=dd.getBoundingClientRect();
           const vh=window.innerHeight;
-          const availBelow=vh-r.bottom-8;   // 按钮底 → 视口底 可用高度
-          const availAbove=r.top-8;         // 按钮顶 → 视口顶 可用高度
-          const up=availBelow<180&&availAbove>availBelow; // 向下空间过小才改向上
+          const availBelow=vh-r.bottom-8;
+          const availAbove=r.top-8;
+          const up=availBelow<200&&availAbove>availBelow;
           dd.classList.toggle("up",up);
           const avail=up?availAbove:availBelow;
-          $("#varMenu").style.maxHeight=Math.max(80,Math.min(vh*0.6,avail))+"px";
+          const menu=$("#varMenu");
+          menu.style.maxHeight=Math.max(80,Math.min(vh*0.6,avail))+"px";
+          menu.style.left=r.left+"px";
+          menu.style.width=r.width+"px";
+          menu.style.right="auto";
+          if(up){menu.style.bottom=(vh-r.top+6)+"px";menu.style.top="auto";}
+          else{menu.style.top=(r.bottom+6)+"px";menu.style.bottom="auto";}
         }
       };
     document.addEventListener("mousedown",_varOutside,true);

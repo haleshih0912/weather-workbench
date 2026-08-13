@@ -1544,16 +1544,6 @@ function haversine(la1,lo1,la2,lo2){
   const a=Math.sin(dLa/2)**2+Math.cos(toR(la1))*Math.cos(toR(la2))*Math.sin(dLo/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
-/* Nominatim 的 q= 不做子串展开："花木"只能命中名为"花木"的 3 个远郊村落，
-   而用户想要的"花木街道/花木路/花木新村/花木派出所"是不同词条。
-   策略：原词 + 常见地理后缀变体并行查询，合并后按与当前坐标的距离重排。 */
-function geoQueries(q){
-  const base=(q||"").trim();if(!base)return [base];
-  const sufs=["街道","路","新村","派出所","社区","小区","广场","公园"];
-  const set=new Set([base]);
-  if(!sufs.some(s=>base.endsWith(s))) sufs.forEach(s=>set.add(base+s));
-  return [...set];
-}
 /* 点击搜索结果框（#locSearch）之外任意位置，折叠搜索结果 */
 function closeGeoRes(){
   const res=$("#geoRes");

@@ -537,10 +537,11 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 <div class="sheet" id="sheet">
   <div class="grip"></div>
   <h4>设置与数据</h4>
-  <div class="note" style="margin:-6px 0 14px">填了下面任一密钥，下次打开就能拿到那家国内预报中心的数据；不填也能用国际多源综合。</div>
+  <div class="note" style="margin:-6px 0 14px">填了下面任一密钥，下次打开就能拿到那家国内预报中心的数据；不填也能用国际多源综合。<b style="color:var(--systemIndigo)">高德 Key</b> 还用于 App 内「位置搜索」——微信/Safari 内搜地名必填（免费地图接口在手机网络下会被限流）。</div>
   <div class="keyrow"><label>和风</label><input id="qkey" placeholder="QWeather 开发密钥（选填）"></div>
   <div class="keyrow"><label>彩云</label><input id="ckey" placeholder="Caiyun 开发密钥（选填）"></div>
   <div class="keyrow"><label>心知</label><input id="sxkey" placeholder="Seniverse 开发密钥（选填）"></div>
+  <div class="keyrow"><label>高德</label><input id="akey" placeholder="高德 Web服务 Key（位置搜索用，选填）"></div>
   <button class="btn" id="saveKey">保存密钥</button>
   <button class="btn sec" id="expBtn">导出备份 (JSON)</button>
   <button class="btn sec" id="impBtn">导入恢复</button>
@@ -580,7 +581,7 @@ const $$=s=>[...document.querySelectorAll(s)];
 const APP={lat:31.2304,lng:121.4737,name:"上海",sub:"",addr:null};
 
 /* ---------- state ---------- */
-let ST={lastLat:null,lastLng:null,lastName:null,lastSub:null,saved:[],cal:{},qkey:"",ckey:"",sxkey:"",mapLat:null,mapLng:null};
+let ST={lastLat:null,lastLng:null,lastName:null,lastSub:null,saved:[],cal:{},qkey:"",ckey:"",sxkey:"",akey:"",mapLat:null,mapLng:null};
 function load(){
   try{const j=JSON.parse(localStorage.getItem(LS+"state")||"{}");ST=Object.assign(ST,j);}catch(e){}
   /* 迁移：旧版本曾把"定位中…"这类占位名写进了 localStorage，导致刷新后顶栏永久显示。
@@ -1559,42 +1560,77 @@ async function geoSearch(q){
   const btn=$("#geoBtn");btn.textContent="搜索中";btn.disabled=true;
   try{
     const lat=APP.lat!=null?APP.lat:31.2304, lng=APP.lng!=null?APP.lng:121.4737;
-    const all=[]; let svcErr=false;
-    /* 主源 Nominatim：原先对每词串行发 8 个后缀变体请求，Nominatim 匿名限流 1 req/s，
-       在微信 webview 慢网下极易 429/超时 → 静默无结果。改为最多 2 个请求，限流友好。 */
     const base=q.trim();
-    const terms=[base];
-    if(!/(街道|路|新村|派出所|社区|小区|广场|公园|镇|乡|村|号)$/.test(base)) terms.push(base+"街道");
-    for(const t of terms){
-      try{
-        const url="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=cn&limit=8&accept-language=zh-CN"
-          +"&lat="+lat+"&lon="+lng+"&q="+encodeURIComponent(t);
-        const r=await fetchTO(url,null,8000);
-        if(!r.ok){ if(r.status===429||r.status===403||r.status===401) svcErr=true; continue; }
-        const txt=await r.text();
-        let j; try{ j=JSON.parse(txt); }catch(e){ svcErr=true; continue; }
-        if(Array.isArray(j)) j.forEach(p=>all.push(p));
-      }catch(e){ svcErr=true; }
+    const all=[]; let svcErr=false, anyKey=false;
+
+    /* 多源并行合并：高德(国内最稳,按key限流,不受运营商NAT影响) > 和风(国内,需key) > Nominatim(无需key但按IP限流,手机网络易429)。
+       任一源成功即合并去重，最大化在微信/Safari/桌面下的命中率。 */
+    const jobs=[];
+    // 高德：国内 Web 服务，浏览器可跨域调用(已验证 CORS *)，微信/Safari 上最稳
+    if(ST.akey){
+      anyKey=true;
+      jobs.push((async()=>{
+        const items=[];
+        try{ // 关键词输入提示：覆盖路名/POI/地名
+          const r=await fetchTO("https://restapi.amap.com/v3/assistant/inputtips?key="+ST.akey+"&keywords="+encodeURIComponent(base)+"&city=&output=JSON",null,8000);
+          const j=await r.json().catch(()=>null);
+          if(j&&j.status==="1"&&Array.isArray(j.tips)) j.tips.forEach(t=>{
+            if(!t.location||t.location.indexOf(",")<0)return;
+            const p=t.location.split(","); items.push({lat:+p[1],lon:+p[0],name:t.name,display_name:[t.district,t.name].filter(Boolean).join(","),address:{city:t.district}});
+          });
+        }catch(e){ svcErr=true; }
+        try{ // 结构化地址地理编码
+          const r=await fetchTO("https://restapi.amap.com/v3/geocode/geo?key="+ST.akey+"&address="+encodeURIComponent(base)+"&output=JSON",null,8000);
+          const j=await r.json().catch(()=>null);
+          if(j&&j.status==="1"&&Array.isArray(j.geocodes)) j.geocodes.forEach(g=>{
+            if(!g.location||g.location.indexOf(",")<0)return;
+            const p=g.location.split(","); items.push({lat:+p[1],lon:+p[0],name:g.formatted_address,display_name:g.formatted_address,address:{}});
+          });
+        }catch(e){ svcErr=true; }
+        return items;
+      })());
     }
-    /* 兜底源：和风城市搜索（需设置中已填 Key；国内/微信稳定可达）。微信常限制 Nominatim 这类海外接口。 */
-    if(!all.length && ST.qkey){
-      try{
-        const r=await fetchTO("https://geoapi.qweather.com/v2/city/lookup?location="+encodeURIComponent(q)+"&key="+ST.qkey+"&number=20",null,8000);
-        if(r.ok){
-          const j=await r.json();
-          if(j&&j.location&&j.location.length){
-            all=j.location.map(c=>({
-              lat:c.lat, lon:c.lon, name:c.name,
-              display_name:[c.adm1,c.adm2,c.name].filter(Boolean).join(",")+",中国",
-              address:{state:c.adm1,city:c.adm2,county:c.adm3}
-            }));
-          }
-        }
-      }catch(e){}
+    // 和风：国内可用（端点已修正为 /geo/v2/city-lookup，旧 /v2/ 返回 404）
+    if(ST.qkey){
+      anyKey=true;
+      jobs.push((async()=>{
+        try{
+          const r=await fetchTO("https://geoapi.qweather.com/geo/v2/city/lookup?location="+encodeURIComponent(base)+"&key="+ST.qkey+"&number=20&range=cn",null,8000);
+          const j=await r.json().catch(()=>null);
+          if(j&&j.location&&j.location.length) return j.location.map(c=>({
+            lat:+c.lat, lon:+c.lon, name:c.name,
+            display_name:[c.adm1,c.adm2,c.name].filter(Boolean).join(",")+",中国",
+            address:{state:c.adm1,city:c.adm2,county:c.adm3}
+          }));
+        }catch(e){ svcErr=true; }
+        return [];
+      })());
     }
+    // Nominatim：无需 key，但按 IP 限流，中国手机网络(运营商NAT)极易 429 → 仅作最后兜底
+    jobs.push((async()=>{
+      const items=[]; const terms=[base];
+      if(!/(街道|路|新村|派出所|社区|小区|广场|公园|镇|乡|村|号)$/.test(base)) terms.push(base+"街道");
+      for(const t of terms){
+        try{
+          const u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=cn&limit=8&accept-language=zh-CN"
+            +"&lat="+lat+"&lon="+lng+"&q="+encodeURIComponent(t);
+          const r=await fetchTO(u,null,8000);
+          if(!r.ok){ if([429,403,401].includes(r.status)) svcErr=true; continue; }
+          const j=await r.json().catch(()=>{svcErr=true;return null;});
+          if(Array.isArray(j)) j.forEach(p=>items.push(p));
+        }catch(e){ svcErr=true; }
+      }
+      return items;
+    })());
+
+    const results=await Promise.allSettled(jobs);
+    results.forEach(res=>{ if(res.status==="fulfilled"&&Array.isArray(res.value)) all.push(...res.value); });
+
     if(!all.length){
-      if(svcErr){
-        res.innerHTML='<div style="color:var(--systemRed);line-height:1.6">搜索服务连接失败：微信内置浏览器可能限制了第三方地图接口。可改用：①在「设置」填入和风 Key 后重试；②切到「手动输入」直接填经纬度定位。</div>';
+      if(svcErr && !anyKey){
+        res.innerHTML='<div style="color:var(--systemRed);line-height:1.6">搜索失败：当前未配置「高德 / 和风」Key，而免费地图接口在手机网络下被限流。请在「设置」填入<b>高德 Web服务 Key</b>（推荐，微信/Safari 最稳）或和风 Key 后重试；或切「手动输入」直接填经纬度。</div>';
+      }else if(svcErr){
+        res.innerHTML='<div style="color:var(--systemRed);line-height:1.6">搜索服务连接失败：微信/移动网络对第三方接口不稳定。已尝试高德/和风仍无结果，请检查设置里的 Key 是否有效，或切「手动输入」填经纬度定位。</div>';
       }else{
         res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';
       }
@@ -1907,12 +1943,12 @@ function setupNav(){
 
 /* ---------- backup sheet ---------- */
 function setupSheet(){
-  $("#btnBackup").onclick=()=>{$("#qkey").value=ST.qkey||"";$("#ckey").value=ST.ckey||"";$("#sxkey").value=ST.sxkey||"";$("#scrim").classList.add("on");$("#sheet").classList.add("on");};
+  $("#btnBackup").onclick=()=>{$("#qkey").value=ST.qkey||"";$("#ckey").value=ST.ckey||"";$("#sxkey").value=ST.sxkey||"";$("#akey").value=ST.akey||"";$("#scrim").classList.add("on");$("#sheet").classList.add("on");};
   const bl=$("#btnLocate");if(bl)bl.onclick=()=>locateMe(bl);
   const lc=$("#locateCard");if(lc){lc.onclick=locateMe;lc.onkeydown=e=>{if(e.key==="Enter"||e.key===" ")locateMe();};}
   $("#closeSheet").onclick=closeSheet;
   $("#scrim").onclick=closeSheet;
-  $("#saveKey").onclick=()=>{ST.qkey=$("#qkey").value.trim();ST.ckey=$("#ckey").value.trim();ST.sxkey=$("#sxkey").value.trim();save();closeSheet();toast("密钥已保存，刷新生效");};
+  $("#saveKey").onclick=()=>{ST.qkey=$("#qkey").value.trim();ST.ckey=$("#ckey").value.trim();ST.sxkey=$("#sxkey").value.trim();ST.akey=$("#akey").value.trim();save();closeSheet();toast("密钥已保存，刷新生效");};
   $("#expBtn").onclick=()=>{
     const blob=new Blob([JSON.stringify(ST,null,2)],{type:"application/json"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);
@@ -2244,7 +2280,7 @@ function reverseLoc(lat,lng){
     if(ST.qkey){
       try{
         const loc=lng.toFixed(4)+","+lat.toFixed(4); // 和风要求“经度,纬度”
-        const r=await fetchTO("https://geoapi.qweather.com/v2/city/lookup?location="+loc+"&key="+ST.qkey+"&number=1",null,4000);
+        const r=await fetchTO("https://geoapi.qweather.com/geo/v2/city/lookup?location="+loc+"&key="+ST.qkey+"&number=1",null,4000);
         if(r.ok){
           const j=await r.json();
           if(j.location&&j.location[0]){

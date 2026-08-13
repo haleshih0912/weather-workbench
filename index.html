@@ -609,7 +609,8 @@ function fmtLocal(d){const p=n=>String(n).padStart(2,"0");return d.getFullYear()
 
 /* ---------- models & weights ----------
    8 家国际 NWP 中心：METNO（挪威）已移除——其 2.5km 网格只覆盖北欧，中国境内无本地嵌套。
-   法国、加拿大此前已移除。本版权重完全依据「中国本土公开评测」分配。 */
+   法国、加拿大此前已移除。本版权重为基于经验的启发式先验（heuristic prior），非权威评测结果；
+   实际融合时按各源实测偏差（calFactor）动态微调。 */
 const MODELS=[
   {req:"ecmwf_ifs",key:"ecmwf",name:"ECMWF IFS",org:"欧洲中心 0.1°",country:"欧洲",prior:.20,color:"#5856d6"},
   {req:"ecmwf_ifs025",key:"ecmwf025",name:"ECMWF IFS025",org:"欧洲中心 0.25°",country:"欧洲",prior:.17,color:"#5856d6"},
@@ -627,18 +628,11 @@ const DOMESTIC=[
   {key:"caiyun",name:"彩云天气",org:"分钟级降水",country:"中国",prior:.07,color:"#34c759",live:true}
 ];
 
-/* ---------- 逐变量技巧矩阵（v4：完全基于中国本土验证）----------
-   权重逻辑（依据中国本土公开论文与气象局业务公报，2010–2026）：
-   · 气温、相对湿度、能见度：ECMWF 最强（中国 2421 站 2010–2013 评估，东部偏差仅 ±0.5K）；
-     AIFS / ICON 在中国本土缺少强证据，权重保守。ECMWF 风速系统性偏大 +1m/s，已做偏差订正。
-   · 风速、阵风、风向：JMA 在中国江淮/华南最优（2421 站评估），KMA 北方/西部补充；
-     ECMWF 北方/西部也强，但风速订正后仍可靠；UKMO 海洋边界层较准。
-   · 降水：ECMWF 中段（3–10mm）位置场强，但 ≥10mm 全时效 CMA-MESO 全面占优（业务公报），
-     25mm 阈值提升 50–100%，所以 ECMWF 在大雨/暴雨项权重需下调；CMA-GFS-V4.2 在江淮梅雨
-     暴雨以上亦优于 ECMWF-HRES，因此 KMA/JMA 在东亚季风区强降水也有支撑。
-   · 气压、云量、能见度、紫外线：各家差异较小，权重平缓。
-   · AIFS、ICON 在中国本土「缺证据」一律保守降权。
-*/
+/* ---------- 逐变量技巧矩阵（启发式先验权重）----------
+   以下权重为基于经验的启发式先验（heuristic prior），并非来自权威公开评测，
+   仅作为融合的初始倾向；实际融合时还会按各源近期实测偏差（calFactor）自动微调。
+   各变量的相对倾向（如 ECMWF 在气温/气压较稳、JMA/KMA 在风场较优）取自通用认知，
+   具体数值为可手工调整的经验先验。 */
 const SKILL={
   temp:  {ecmwf:95,ecmwf025:88,aifs:70,icon:72,kma:80,ukmo:78,jma:82,gfs:60},
   precip:{ecmwf:90,ecmwf025:84,aifs:72,icon:68,kma:80,ukmo:72,jma:80,gfs:65},
@@ -652,18 +646,6 @@ const SKILL={
   uv:    {ecmwf:85,ecmwf025:80,aifs:60,icon:75,kma:88,ukmo:75,jma:90,gfs:70}
 };
 const VAR_LABEL={temp:"气温",precip:"降水量",wind:"风速",gust:"最大瞬时风速",dir:"风向",hum:"湿度",pres:"气压",cloud:"云量",vis:"能见度",uv:"紫外线强度"};
-const VAR_EVID={
-  temp:"2421 个国家级自动站（2010–2013 实测，龚伟伟等《气候与环境研究》）显示：地面气温 ECMWF 最优，JMA 次之，GFS 在夏季偏差最大。",
-  precip:"中央气象台 2020 汛期业务检验：24 小时累计 ECMWF 略优，但 ≥10mm 全时效 CMA-MESO 占优，25mm 阈值提升 50–100%；江淮梅雨暴雨以上 CMA-GFS-V4.2 优于 ECMWF-HRES。",
-  wind:"2421 站评估：江淮、华南 JMA 最优，北方、西部 ECMWF 最优；ECMWF 风速系统性偏大约 1m/s，已做偏差订正；KMA 在东亚同化更接近，对中国北方、西部作补充。",
-  gust:"由风场评估延伸：JMA 在东亚季风区风场与阵风刻画更好；KMA 在韩国及中国北方同化更优；ICON/DWD 在欧洲阵风有验证，但中国本土证据不足，给中等权重。",
-  dir:"随风速评估，量级与风速同序；ECMWF 在中国东部矢量更稳定，JMA 在江淮、华南最强。",
-  hum:"2421 站评估：相对湿度 ECMWF 最优（明显优于 JMA 与 GFS）；AIFS 在中国本土缺证据，保守降权。",
-  pres:"气压同化技术成熟，各模式在中国差异很小，权重趋于平缓。",
-  cloud:"云量为各模式共同难点，中国本土差异不显著，权重趋于平缓。",
-  vis:"能见度由云、雾派生，中国雾霾多发区需本地化订正（彩云、和风有专门模型），国际模式本身差异较小。",
-  uv:"紫外线为晴空叠加云量诊断量；JMA、KMA 在东亚同化更近；ECMWF 整体稳定。权重中等且平缓。"
-};
 
 /* calibration effective weight */
 function calFactor(key){
@@ -799,7 +781,7 @@ function parseModels(j){
       vis:h["visibility_"+m.req]||[],
       uv:h["uv_index_"+m.req]||[]});
   }
-  /* 风速偏差订正：ECMWF 在中国系统性偏大 +1 m/s（≈+3.6 km/h），按 2421 站评估订正 */
+  /* 风速偏差订正：ECMWF 在中国系统性偏大 +1 m/s（≈+3.6 km/h），按经验先验下偏订正 */
   const ecKeys=["ecmwf","ecmwf025"];
   for(const m of models){
     if(ecKeys.includes(m.key)){
@@ -1613,26 +1595,12 @@ function geoSub(p){
    默认都是国内地址，没必要重复出现「中国」。 */
 function cnAddr(s){
   if(!s)return "";
-  /* 去掉各位置的 ", 中国" / ", China" / ", CN"（含其前后逗号空格） */
-  let t=String(s).replace(/,\s*(中国|China|CN)\b/gi,"");
+  /* 去掉各位置的 ", 中国" / ", China" / ", CN"（含其前后逗号空格）。
+     注意：\b 对中文不生效，故用首尾断言 (?=[，,\s]|$) 确保只剥独立的国家段。 */
+  let t=String(s).replace(/,\s*(中国|China|CN)(?=[，,\s]|$)/gi,"");
   /* 折叠连续逗号/空白 */
-  t=t.replace(/\s*,\s*,\s*/g,",").replace(/^[,\s]+|[,\s]+$/g,"");
+  t=t.replace(/\s*,\s*,\s*/g,",").replace(/^[,\s]+|[,\s]+$/g,"").trim();
   return t;
-}
-/* 从 Nominatim j.address 拼一个简短的中文地名（省/市/区/街道），用于显示在顶栏。 */
-function cnName(j){
-  if(!j)return "";
-  const a=j.address;if(!a)return "";
-  const prv=a.province||a.state||"";
-  const cty=a.city||a.town||"";
-  const cnt=a.county||a.district||"";
-  const sub=a.suburb||a.neighbourhood||a.city_district||"";
-  /* 直辖市（上海市/北京市/...）province==city，不要重复 */
-  const parts=[prv,cty,cnt,sub].filter(Boolean);
-  if(!parts.length)return (j.display_name||"").split(",")[0];
-  /* 去重相邻相同的（如 "上海市 上海市"） */
-  const ded=parts.filter((x,i)=>i===0||x!==parts[i-1]);
-  return ded.join("").replace(/(上海市|北京市|天津市|重庆市|香港特别行政区|澳门特别行政区|台湾省)/g,"$1");
 }
 /* 规范中文地址：省+市+区+道路门牌，保留原始后缀（不再剥"新区"的"区"，避免"浦东新"）。
    直辖市特殊（上海市本身已含"市"，直接作 head）；结果包含具体道路/门牌，确保
@@ -1996,7 +1964,7 @@ function renderVarWeights(){
       '<span class="vw-p">'+pct.toFixed(1)+'%</span>';
     box.appendChild(row);
   });
-  $("#varEvid").textContent="依据："+VAR_EVID[vk];
+  $("#varEvid").textContent="启发式先验权重（按各源实测偏差自动校准，可调）";
 }
 
 /* ---------- main load ---------- */

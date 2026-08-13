@@ -1958,12 +1958,15 @@ function computeConfidence(){
   const score=Math.max(40,Math.min(99,Math.round(55+liveN*4-stdev*4)));
   return {score,liveN,stdev};
 }
-function closeVarDd(){const dd=$("#varDd");if(dd){dd.classList.remove("open");$("#varBtn").setAttribute("aria-expanded","false");}}
-function _varOutside(e){if(!e.target.closest("#varDd"))closeVarDd();}
+function closeVarDd(){const dd=$("#varDd");const menu=$("#varMenu");if(dd)dd.classList.remove("open");if(menu)menu.style.display="none";$("#varBtn").setAttribute("aria-expanded","false");}
+function _varOutside(e){if(e.target.closest("#varDd")||e.target.closest("#varMenu"))return;closeVarDd();}
 function renderVarWeights(){
   const dd=$("#varDd");
   if(!dd)return;
   const menu=$("#varMenu");
+  /* 关键：把菜单挂到 body，彻底脱离 .view 的 transform 动画形成的包含块，
+     保证 position:fixed 始终相对视口定位（否则菜单会飞到错误位置）。 */
+  if(menu.parentNode!==document.body)document.body.appendChild(menu);
   if(!dd.dataset.filled){
     Object.keys(SKILL).forEach(vk=>{
       const it=document.createElement("div");it.className="dd-item";it.dataset.v=vk;it.setAttribute("role","option");
@@ -1973,26 +1976,29 @@ function renderVarWeights(){
     });
     dd.dataset.filled="1";
       $("#varBtn").onclick=()=>{
-        const open=!dd.classList.contains("open");
+        const open=menu.style.display!=="block";
         dd.classList.toggle("open",open);
         $("#varBtn").setAttribute("aria-expanded",open);
         if(open){
-          /* fixed 浮层：直接用 getBoundingClientRect 的视口坐标定位，不再受文档滚动/祖先影响。
-             向下空间不足（<200px）且向上空间更多时，改为向上展开；高度严格锁在视口可用空间内，绝不超出视口。 */
+          /* fixed 浮层：用 getBoundingClientRect 的视口坐标直接定位，高度锁在视口可用空间内，绝不超出视口。 */
           const r=dd.getBoundingClientRect();
-          const vh=window.innerHeight;
-          const availBelow=vh-r.bottom-8;
+          const vh=window.innerHeight, vw=window.innerWidth;
+          const foot=Math.max(56,parseInt(getComputedStyle(document.querySelector("nav")||document.body).height||"56",10));
+          const availBelow=vh-r.bottom-foot-8;
           const availAbove=r.top-8;
           const up=availBelow<200&&availAbove>availBelow;
           dd.classList.toggle("up",up);
           const avail=up?availAbove:availBelow;
-          const menu=$("#varMenu");
           menu.style.maxHeight=Math.max(80,Math.min(vh*0.6,avail))+"px";
-          menu.style.left=r.left+"px";
-          menu.style.width=r.width+"px";
+          const w=Math.min(r.width, vw-24);
+          menu.style.left=Math.max(12,Math.min(r.left, vw-w-12))+"px";
+          menu.style.width=w+"px";
           menu.style.right="auto";
           if(up){menu.style.bottom=(vh-r.top+6)+"px";menu.style.top="auto";}
           else{menu.style.top=(r.bottom+6)+"px";menu.style.bottom="auto";}
+          menu.style.display="block";
+        } else {
+          menu.style.display="none";
         }
       };
     document.addEventListener("mousedown",_varOutside,true);

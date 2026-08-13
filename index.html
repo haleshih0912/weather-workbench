@@ -1969,20 +1969,23 @@ function renderVarWeights(){
       menu.appendChild(it);
     });
     dd.dataset.filled="1";
-    $("#varBtn").onclick=()=>{
-      const open=!dd.classList.contains("open");
-      dd.classList.toggle("open",open);
-      $("#varBtn").setAttribute("aria-expanded",open);
-      if(open){
-        /* 空间不足时向上展开，并据可用高度限制 max-height，保证全部选项可见可选（用系统/iOS 原生滚动条滚动） */
-        const r=dd.getBoundingClientRect();
-        const vh=window.innerHeight,spaceBelow=vh-r.bottom,spaceAbove=r.top;
-        const up=spaceBelow<260&&spaceAbove>spaceBelow;
-        dd.classList.toggle("up",up);
-        const avail=up?spaceAbove-12:spaceBelow-12;
-        $("#varMenu").style.maxHeight=Math.max(120,Math.min(vh*0.6,avail))+"px";
-      }
-    };
+      $("#varBtn").onclick=()=>{
+        const open=!dd.classList.contains("open");
+        dd.classList.toggle("open",open);
+        $("#varBtn").setAttribute("aria-expanded",open);
+        if(open){
+          /* 关键：max-height 严格限制在「按钮到视口边缘」的真实可用空间内（向下=到视口底，向上=到视口顶），
+             绝不超出视口，因此页面拉到底也不会被截断；超出的选项交给系统/iOS 原生滚动条上下滑动。 */
+          const r=dd.getBoundingClientRect();
+          const vh=window.innerHeight;
+          const availBelow=vh-r.bottom-8;   // 按钮底 → 视口底 可用高度
+          const availAbove=r.top-8;         // 按钮顶 → 视口顶 可用高度
+          const up=availBelow<180&&availAbove>availBelow; // 向下空间过小才改向上
+          dd.classList.toggle("up",up);
+          const avail=up?availAbove:availBelow;
+          $("#varMenu").style.maxHeight=Math.max(80,Math.min(vh*0.6,avail))+"px";
+        }
+      };
     document.addEventListener("mousedown",_varOutside,true);
   }
   const vk=dd.dataset.v||"temp";

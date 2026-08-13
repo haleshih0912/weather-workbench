@@ -1986,10 +1986,13 @@ function renderVarWeights(){
           const foot=Math.max(56,parseInt(getComputedStyle(document.querySelector("nav")||document.body).height||"56",10));
           const availBelow=vh-r.bottom-foot-8;
           const availAbove=r.top-8;
+          const card=dd.closest(".card"); const cardRect=card?card.getBoundingClientRect():null;
+          const maxDown=cardRect?Math.min(availBelow, cardRect.bottom-r.bottom-6):availBelow;
+          const maxUp=cardRect?Math.min(availAbove, r.top-cardRect.top-6):availAbove;
           const up=availBelow<200&&availAbove>availBelow;
           dd.classList.toggle("up",up);
-          const avail=up?availAbove:availBelow;
-          menu.style.maxHeight=Math.max(80,Math.min(vh*0.6,avail))+"px";
+          const avail=up?maxUp:maxDown;
+          menu.style.maxHeight=Math.max(120,Math.min(vh*0.6,avail))+"px";
           const w=Math.min(r.width, vw-24);
           menu.style.left=Math.max(12,Math.min(r.left, vw-w-12))+"px";
           menu.style.width=w+"px";

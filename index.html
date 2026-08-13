@@ -1569,19 +1569,47 @@ async function geoSearch(q){
   const btn=$("#geoBtn");btn.textContent="搜索中";btn.disabled=true;
   try{
     const lat=APP.lat!=null?APP.lat:31.2304, lng=APP.lng!=null?APP.lng:121.4737;
-    const qs=geoQueries(q);
-    const all=[];
-    for(const t of qs){
+    const all=[]; let svcErr=false;
+    /* 主源 Nominatim：原先对每词串行发 8 个后缀变体请求，Nominatim 匿名限流 1 req/s，
+       在微信 webview 慢网下极易 429/超时 → 静默无结果。改为最多 2 个请求，限流友好。 */
+    const base=q.trim();
+    const terms=[base];
+    if(!/(街道|路|新村|派出所|社区|小区|广场|公园|镇|乡|村|号)$/.test(base)) terms.push(base+"街道");
+    for(const t of terms){
       try{
-        const url="https://nominatim.openstreetmap.org/search?format=json&countrycodes=cn&limit=6&accept-language=zh-CN"
+        const url="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=cn&limit=8&accept-language=zh-CN"
           +"&lat="+lat+"&lon="+lng+"&q="+encodeURIComponent(t);
-        const r=await fetchTO(url);
-        const j=await r.json();
+        const r=await fetchTO(url,null,8000);
+        if(!r.ok){ if(r.status===429||r.status===403||r.status===401) svcErr=true; continue; }
+        const txt=await r.text();
+        let j; try{ j=JSON.parse(txt); }catch(e){ svcErr=true; continue; }
         if(Array.isArray(j)) j.forEach(p=>all.push(p));
-      }catch(e){}
-      await new Promise(r=>setTimeout(r,200)); // 尊重 Nominatim 匿名 1 req/s 限制
+      }catch(e){ svcErr=true; }
     }
-    if(!all.length){res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';btn.textContent="搜索";btn.disabled=false;return;}
+    /* 兜底源：和风城市搜索（需设置中已填 Key；国内/微信稳定可达）。微信常限制 Nominatim 这类海外接口。 */
+    if(!all.length && ST.qkey){
+      try{
+        const r=await fetchTO("https://geoapi.qweather.com/v2/city/lookup?location="+encodeURIComponent(q)+"&key="+ST.qkey+"&number=20",null,8000);
+        if(r.ok){
+          const j=await r.json();
+          if(j&&j.location&&j.location.length){
+            all=j.location.map(c=>({
+              lat:c.lat, lon:c.lon, name:c.name,
+              display_name:[c.adm1,c.adm2,c.name].filter(Boolean).join(",")+",中国",
+              address:{state:c.adm1,city:c.adm2,county:c.adm3}
+            }));
+          }
+        }
+      }catch(e){}
+    }
+    if(!all.length){
+      if(svcErr){
+        res.innerHTML='<div style="color:var(--systemRed);line-height:1.6">搜索服务连接失败：微信内置浏览器可能限制了第三方地图接口。可改用：①在「设置」填入和风 Key 后重试；②切到「手动输入」直接填经纬度定位。</div>';
+      }else{
+        res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换关键词试试</div>';
+      }
+      btn.textContent="搜索";btn.disabled=false;return;
+    }
     const seen=new Set();
     const uniq=all.filter(p=>{const k=Math.round(+p.lat*1000)+","+Math.round(+p.lon*1000);if(seen.has(k))return false;seen.add(k);return true;});
     uniq.forEach(p=>{p._d=haversine(lat,lng,+p.lat,+p.lon);});

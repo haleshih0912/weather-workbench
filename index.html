@@ -4892,7 +4892,9 @@ async function geoSearch(q){
     const seen=new Set();
     const uniq=all.filter(p=>{const k=Math.round(+p.lat*1000)+","+Math.round(+p.lon*1000);if(seen.has(k))return false;seen.add(k);return true;});
     uniq.forEach(p=>{p._d=haversine(lat,lng,+p.lat,+p.lon);});
-    uniq.sort((a,b)=>a._d-b._d);
+    /* 具体（区/县/带上级市）优先于城市/省级，避免一搜城市就默认选到宏观的"上海市" */
+    const spec=p=>(/区$|县$/.test(p.name)||(p.address&&p.address.city))?1:0;
+    uniq.sort((a,b)=>(spec(b)-spec(a))||(a._d-b._d));
     const top=uniq.slice(0,20);
     res.innerHTML="";res.style.maxHeight="60vh";res.style.overflowY="auto";
     top.forEach(p=>{
@@ -5532,6 +5534,20 @@ function nearestCity(lat,lng){
   }
   return best;
 }
+/* 离线逆地理：用本地区/县级库找最近的具体区县（无需 Key、无需网络，零配置默认可用）。
+   比 nearestCity 精确到区县，GPS 自动定位也能显示"浦东新区"而非笼统的"上海"。 */
+function nearestDistrict(lat,lng){
+  let best=null,bd=1e18;
+  const cos=Math.cos(lat*Math.PI/180);
+  for(const e of CITYDB){
+    if(e[1]===e[0]) continue;                       // 省级整体（如 上海市/浙江省）
+    if(e[2]==='' && /[省市]$/.test(e[0])) continue; // 地级市整体（如 杭州市）
+    const dl=lat-e[3], dn=(lng-e[4])*cos;
+    const d=dl*dl+dn*dn;
+    if(d<bd){bd=d;best=e;}
+  }
+  return best?[best[0],best[1],best[2]]:null;        // [name,province,city]
+}
 function reverseLoc(lat,lng){
   if($("#locLName")&&$("#locLName").textContent==="定位中…")$("#locLName").textContent="已定位";
   (async()=>{
@@ -5550,7 +5566,10 @@ function reverseLoc(lat,lng){
         }
       }catch(e){}
     }
-    /* 2) 离线最近城市（无需 Key、无需网络，普通用户默认可用） */
+    /* 2) 离线最近区/县（无需 Key、无需网络，零配置默认可用，精确到区县） */
+    const nd=nearestDistrict(lat,lng);
+    if(nd){const nm=nd[0],sub=[nd[1],nd[2]].filter(Boolean).join("·");setLoc(lat,lng,nm,sub);toast("已定位到 "+nm);return;}
+    /* 3) 仍取不到（多为海外）则退回最近城市 */
     const nc=nearestCity(lat,lng);
     if(nc){setLoc(lat,lng,nc,"");toast("已定位到 "+nc);return;}
     /* 3) Nominatim（海外，尽力而为） */

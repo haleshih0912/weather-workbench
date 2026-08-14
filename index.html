@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>天气台</title>
-<!-- Leaflet CSS：异步加载，绝不作为首屏阻塞资源（jsDelivr 在国内偶发不可达） -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"></noscript>
+<!-- Leaflet CSS：优先国内镜像（360 baomitu / BootCDN），无 VPN 的国内浏览器也可达；jsDelivr 作兜底。绝不作为首屏阻塞资源。 -->
+<link rel="stylesheet" href="https://lib.baomitu.com/leaflet/1.9.4/leaflet.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://lib.baomitu.com/leaflet/1.9.4/leaflet.min.css"></noscript>
 <style>
 /* ───── design tokens（HIG-aligned: 3 档文字 + 3 档背景 + 1 档分隔） ───── */
 :root{
@@ -487,7 +487,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
           <button class="btn" id="geoBtn">搜索</button>
         </div>
         <div class="res" id="geoRes"></div>
-        <div class="note">数据来自 OpenStreetMap，仅限中国范围。点选结果即定位。</div>
+        <div class="note">本地库已收录全国省 / 市 / 区 / 县（零网络、零 Key 即可搜）。填了高德 / 和风 Key 还能解锁街道 / POI 级精确搜索。</div>
       </div>
       <div id="locAuto" style="display:none;text-align:center;padding:14px 0 4px">
         <div style="font-size:15px;font-weight:600;margin-bottom:6px">使用浏览器定位</div>
@@ -535,7 +535,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 <div class="sheet" id="sheet">
   <div class="grip"></div>
   <h4>设置与数据</h4>
-  <div class="note" style="margin:-6px 0 14px">填了下面任一密钥，下次打开就能拿到那家国内预报中心的数据；不填也能用国际多源综合。<b style="color:var(--systemIndigo)">高德 Key</b> 还用于 App 内「位置搜索」——微信/Safari 内搜地名必填（免费地图接口在手机网络下会被限流）。</div>
+  <div class="note" style="margin:-6px 0 14px">填了下面任一密钥，下次打开就能拿到那家国内预报中心的数据；不填也能用国际多源综合（零 Key 即可用）。<b style="color:var(--systemIndigo)">高德 / 和风 Key</b> 选填：填了可解锁街道 / POI 级精确搜索；城市 / 区县级用内置本地库即可，无需任何 Key、无需 VPN。</div>
   <div class="keyrow"><label>和风</label><input id="qkey" placeholder="QWeather 开发密钥（选填）"></div>
   <div class="keyrow"><label>彩云</label><input id="ckey" placeholder="Caiyun 开发密钥（选填）"></div>
   <div class="keyrow"><label>心知</label><input id="sxkey" placeholder="Seniverse 开发密钥（选填）"></div>
@@ -550,24 +550,25 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
 <div class="toast" id="toast"></div>
 
 <script>
-/* 动态加载 Leaflet：主用 jsDelivr（国内可访问），失败依次回退 unpkg / cdnjs。 */
+/* 动态加载 Leaflet：优先国内可访问镜像（360 baomitu / BootCDN），再回退 jsDelivr / unpkg / cdnjs。
+   保证无 VPN 的国内浏览器（Safari / 微信）也能加载地图组件。 */
 window.__leafletReady=(function(){
-  const css="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
-  const cdns=[
+  const cssCdns=[
+    "https://lib.baomitu.com/leaflet/1.9.4/leaflet.min.css",
+    "https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.css",
+    "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+  ];
+  const jsCdns=[
+    "https://lib.baomitu.com/leaflet/1.9.4/leaflet.min.js",
+    "https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.min.js",
     "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
     "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
   ];
-  (function(l){l.rel="stylesheet";l.href=css;document.head.appendChild(l);})(document.createElement("link"));
-  return new Promise(function(res,rej){
-    let i=0;
-    (function next(){
-      if(i>=cdns.length){rej(new Error("leaflet load failed"));return;}
-      const s=document.createElement("script");
-      s.src=cdns[i++];s.onload=function(){res();};s.onerror=next;
-      document.head.appendChild(s);
-    })();
-  });
+  function loadCss(){return new Promise(function(res){let i=0;(function nx(){if(i>=cssCdns.length){res();return;}const l=document.createElement("link");l.rel="stylesheet";l.href=cssCdns[i++];l.onload=res;l.onerror=nx;document.head.appendChild(l);})();});}
+  function loadJs(){return new Promise(function(res,rej){let i=0;(function nx(){if(i>=jsCdns.length){rej(new Error("leaflet load failed"));return;}const s=document.createElement("script");s.src=jsCdns[i++];s.onload=function(){res();};s.onerror=nx;document.head.appendChild(s);})();});}
+  loadCss(); // 样式异步加载，不阻塞 JS
+  return loadJs();
 })();
 </script>
 <script>
@@ -1530,8 +1531,13 @@ function pickMap(lat,lng){
 }
 async function reverse(lat,lng){
   ST.mapLat=lat;ST.mapLng=lng;save();
+  /* 离线优先：用本地库逆地理到区县（无需网络/Key，国内零配置默认可用）。
+     Nominatim（OSM）在国内无 VPN 不可达，仅作可选在线兜底，失败不影响定位。 */
+  const nd=nearestDistrict(lat,lng);
+  if(nd){const nm=nd[0],sub=[nd[1],nd[2]].filter(Boolean).join(" · ");APP.addr={state:nd[1],city:nd[2]};$("#mapAddr").textContent=nm+(sub?"（"+sub+"）":"")+" · 离线逆地理";return;}
   try{
     const r=await fetchTO("https://nominatim.openstreetmap.org/reverse?format=json&lat="+lat+"&lon="+lng+"&accept-language=zh-CN&zoom=18",null,4000);
+    if(!r.ok) throw new Error("nominatim "+r.status);
     const j=await r.json();
     APP.addr=j.address||APP.addr;
     $("#mapAddr").textContent=fmtCnAddr(j)||(lat.toFixed(4)+", "+lng.toFixed(4));
@@ -4860,8 +4866,8 @@ async function geoSearch(q){
         return [];
       })());
     }
-    // Nominatim（OSM）：免 Key 在线兜底，仅当本地库无命中时调用，覆盖本地库未含的区县/全球地名
-    if(!localHits){ jobs.push((async()=>{
+    // Nominatim（OSM）：免 Key 在线兜底，但国内无 VPN 不可达；仅当用户已填 Key（有在线地理编码意图）时才尝试，避免无 Key 时误报"地图服务"错误
+    if(!localHits && (ST.akey||ST.qkey)){ jobs.push((async()=>{
       const items=[]; const terms=[base];
       if(!/(街道|路|新村|派出所|社区|小区|广场|公园|镇|乡|村|号)$/.test(base)) terms.push(base+"街道");
       for(const t of terms){
@@ -4882,8 +4888,11 @@ async function geoSearch(q){
     results.forEach(res=>{ if(res.status==="fulfilled"&&Array.isArray(res.value)) all.push(...res.value); });
 
     if(!all.length){
+      const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       if(svcErr){
-        res.innerHTML='<div style="color:var(--systemRed);line-height:1.6">搜索失败：当前网络无法连接地图服务。可改用上方「手动输入」直接填经纬度定位。</div>';
+        res.innerHTML='<div style="color:var(--systemRed);line-height:1.6">在线地图服务连接失败（检查网络或密钥）。你也可在「手动输入」直接填经纬度定位，或用下方本地库搜城市 / 区县。</div>';
+      }else if(!ST.akey && !ST.qkey){
+        res.innerHTML='<div style="color:var(--secondaryLabel);line-height:1.6">本地库未收录「'+esc(base)+'」。可：① 在「手动输入」直接填经纬度；② 到「设置」填 高德 / 和风 Key 解锁全国街道级搜索；③ 试试城市 / 区县名（如「上海」「海淀」「浦东新区」）。</div>';
       }else{
         res.innerHTML='<div style="color:var(--secondaryLabel)">未找到，换个关键词试试（如「上海」「海淀」「朝阳」）</div>';
       }

@@ -481,6 +481,11 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-w
         <div class="ltab" data-t="manual">手动输入</div>
         <div class="ltab" data-t="map">地图</div>
       </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin:2px 0 12px;background:var(--secondarySystemFill);border-radius:12px;font-size:12px;color:var(--secondaryLabel);line-height:1.5">
+        <b style="color:var(--label);font-weight:600">天气坐标</b>
+        <span id="locCoord" style="font-family:var(--font-num);color:var(--systemIndigo);font-weight:600">—</span>
+        <span>天气按此<b style="color:var(--label)">精确坐标</b>实时计算（模型网格分辨率约 1–11 km）；显示的地名只是标签，<b style="color:var(--label)">不</b>代表数据按区县平均。GPS / 地图点选可拿到你脚下的精确点。</span>
+      </div>
       <div id="locSearch">
         <div class="field">
           <input id="geoQ" placeholder="搜索中国城市 / 街道 / 小区" inputmode="search">
@@ -5039,6 +5044,7 @@ function locateMe(btn){
 function setLoc(lat,lng,name,sub,persist){
   if(persist===undefined)persist=true;
   APP.lat=lat;APP.lng=lng;APP.name=name;APP.sub=sub||"";
+  const c=$("#locCoord"); if(c) c.textContent=lat.toFixed(4)+", "+lng.toFixed(4);
   $("#locLName").textContent=name;
   $("#locSub").textContent=sub||"";
   if(persist){
@@ -5166,6 +5172,7 @@ function renderSaved(){
   });
 }
 function setupLoc(){
+  const c0=$("#locCoord"); if(c0) c0.textContent=(APP.lat!=null?APP.lat.toFixed(4):"—")+", "+(APP.lng!=null?APP.lng.toFixed(4):"—");
   $$(".ltab").forEach(t=>t.onclick=()=>{
     $$(".ltab").forEach(x=>x.classList.remove("on"));t.classList.add("on");
     const which=t.dataset.t;
